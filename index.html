@@ -160,7 +160,7 @@ td.name .note { color: var(--text-3); font-size: .78rem; display: block; max-wid
 .pos { font-weight: 650; }
 .pos.p1 { color: var(--good); }
 .row-actions button { padding: 4px 8px; font-size: .8rem; }
-.empty { text-align: center; color: var(--text-3); padding: 28px 0; }
+.empty { text-align: center; color: var(--text-3); padding: 28px 8px; white-space: normal; }
 
 /* ---------- form / dialog ---------- */
 dialog {
@@ -496,10 +496,12 @@ const Store = {
   load() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) { this.rides = JSON.parse(raw).map(makeRide); return; }
+      if (raw) {
+        const all = JSON.parse(raw).map(makeRide);
+        this.rides = all.filter(r => !isSample(r));
+        if (this.rides.length !== all.length) this.save();
+      }
     } catch (e) { console.warn('Could not read saved rides', e); }
-    this.rides = SAMPLE().map(makeRide);
-    this.save();
   },
   save() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(this.rides)); } catch (e) { toast('Could not save (storage full or blocked)'); } },
   upsert(r) {
@@ -527,7 +529,7 @@ const Cloud = {
     this.setLabel('Syncing…');
     const timer = setTimeout(() => this.setLabel('Can’t reach sync yet · saved on this device'), 10000);
     try {
-      // first visit with sync: upload what this device has (samples or your local rides)
+      // first visit with sync: upload the rides already on this device
       const meta = await logDoc.get();
       if (!meta.exists) {
         for (const r of Store.rides) await this.col.doc(r.id).set({ ...r });
@@ -538,7 +540,8 @@ const Cloud = {
       if (!snap.metadata.fromCache) { clearTimeout(timer); this.setLabel('Synced to your account'); }
       const rides = [];
       snap.docs.forEach(d => { try { rides.push(makeRide(d.data())); } catch {} });
-      Store.rides = rides; Store.save();
+      rides.filter(isSample).forEach(r => this.del(r.id));        // clear old example rides from the account
+      Store.rides = rides.filter(r => !isSample(r)); Store.save();
       this.ready = true;
       render();
     }, () => { clearTimeout(timer); this.col = null; this.setLabel('Sync stopped · saved on this device'); });
@@ -560,27 +563,21 @@ const Prefs = Object.assign({ range: 'season', metric: 'speed', period: 'week', 
   (() => { try { return JSON.parse(localStorage.getItem(PREFS_KEY)) || {}; } catch { return {}; } })());
 const savePrefs = () => { try { localStorage.setItem(PREFS_KEY, JSON.stringify(Prefs)); } catch {} };
 
-/* ---------- sample data: 15 realistic entries relative to today ---------- */
-function SAMPLE() {
-  const d = n => { const t = new Date(); t.setDate(t.getDate() - n); return isoDate(t); };
-  return [
-    { date: d(118), name: 'Spring base miles',       type: 'training', distance: 62.4,  time: '2:21:10', power: 172, hr: 138, elevation: 540,  notes: 'Steady Z2, felt good.' },
-    { date: d(110), name: 'Tuesday club chaingang',  type: 'group',    distance: 48.0,  time: '1:31:40', power: 205, hr: 152, elevation: 310,  notes: 'Fast through-and-off.' },
-    { date: d(101), name: 'Riverside Crit',          type: 'race',     distance: 40.0,  time: '0:59:12', power: 238, hr: 168, elevation: 120,  position: 7,  notes: 'Missed the late break.' },
-    { date: d(94),  name: 'Hill repeats',            type: 'training', distance: 38.6,  time: '1:39:55', power: 196, hr: 149, elevation: 880,  notes: '6x5 min at threshold.' },
-    { date: d(86),  name: 'Gran Fondo Valley 140',   type: 'race',     distance: 141.2, time: '4:58:30', power: 191, hr: 146, elevation: 2240, position: 23, notes: 'Cramped on the last climb. Fuel more!' },
-    { date: d(77),  name: 'Recovery spin',           type: 'training', distance: 25.3,  time: '1:01:20', power: null, hr: 118, elevation: 90,  notes: 'Easy legs.' },
-    { date: d(69),  name: 'Saturday cafe ride',      type: 'group',    distance: 74.8,  time: '2:42:05', power: 178, hr: 136, elevation: 760,  notes: 'Great coffee stop.' },
-    { date: d(60),  name: 'Harbour 25 km TT',        type: 'race',     distance: 25.0,  time: '0:36:48', power: 262, hr: 171, elevation: 85,   position: 4,  notes: 'PB pacing, 4 s off the podium.' },
-    { date: d(52),  name: 'Long endurance day',      type: 'training', distance: 118.5, time: '4:15:40', power: 165, hr: 134, elevation: 1520, notes: 'Longest training ride this year.' },
-    { date: d(41),  name: 'Mountain Road Race',      type: 'race',     distance: 96.0,  time: '3:02:15', power: 224, hr: 163, elevation: 1680, position: 2,  notes: 'Second in the sprint from a group of 8!' },
-    { date: d(29),  name: 'Sweet spot intervals',    type: 'training', distance: 52.1,  time: '1:47:30', power: 210, hr: 150, elevation: 420,  notes: '3x15 min SST.' },
-    { date: d(21),  name: 'Thursday night worlds',   type: 'group',    distance: 44.5,  time: '1:19:50', power: 214, hr: 158, elevation: 260,  notes: 'Attacked twice, got caught.' },
-    { date: d(14),  name: 'Autumn Classic',          type: 'race',     distance: 72.0,  time: '1:58:40', power: 231, hr: 165, elevation: 940,  position: 1,  notes: 'First win! Solo from 3 km out.' },
-    { date: d(7),   name: 'Gravel explore',          type: 'training', distance: 57.9,  time: '2:31:15', power: 168, hr: 141, elevation: 980,  notes: 'Muddy, mixed surface.' },
-    { date: d(2),   name: 'Coffee & tempo',          type: 'training', distance: 41.2,  time: '1:22:30', power: 198, hr: 147, elevation: 350,  notes: '' },
-  ];
-}
+/* ---------- legacy sample cleanup ----------
+   Early versions pre-loaded 15 example rides. They are recognised by their exact
+   name + distance + elevation + notes and removed automatically; your own rides
+   are never touched. */
+const SAMPLE_SIGNATURES = new Set([
+  'Spring base miles|62.4|540|Steady Z2, felt good.', 'Tuesday club chaingang|48|310|Fast through-and-off.',
+  'Riverside Crit|40|120|Missed the late break.', 'Hill repeats|38.6|880|6x5 min at threshold.',
+  'Gran Fondo Valley 140|141.2|2240|Cramped on the last climb. Fuel more!', 'Recovery spin|25.3|90|Easy legs.',
+  'Saturday cafe ride|74.8|760|Great coffee stop.', 'Harbour 25 km TT|25|85|PB pacing, 4 s off the podium.',
+  'Long endurance day|118.5|1520|Longest training ride this year.', 'Mountain Road Race|96|1680|Second in the sprint from a group of 8!',
+  'Sweet spot intervals|52.1|420|3x15 min SST.', 'Thursday night worlds|44.5|260|Attacked twice, got caught.',
+  'Autumn Classic|72|940|First win! Solo from 3 km out.', 'Gravel explore|57.9|980|Muddy, mixed surface.',
+  'Coffee & tempo|41.2|350|',
+]);
+const isSample = r => SAMPLE_SIGNATURES.has(`${r.name}|${r.distance}|${r.elevation}|${r.notes}`);
 
 /* =================================================================
    2. UTILITIES
@@ -995,7 +992,7 @@ function renderTable(rides) {
         <button class="ghost" data-edit="${r.id}" aria-label="Edit ${esc(r.name)}">Edit</button>
         <button class="ghost danger" data-del="${r.id}" aria-label="Delete ${esc(r.name)}">✕</button>
       </td>
-    </tr>`).join('') : `<tr><td colspan="11" class="empty">No rides match these filters.</td></tr>`;
+    </tr>`).join('') : `<tr><td colspan="11" class="empty">${Store.rides.length ? 'No rides match these filters.' : 'No rides yet. Tap <b>▶ Ride</b> to record one with your phone, or <b>+ Add ride</b> to enter one.'}</td></tr>`;
 }
 
 /* =================================================================
