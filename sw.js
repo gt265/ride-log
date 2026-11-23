@@ -1,6 +1,6 @@
 // Offline support: the whole app is cached on first visit so it opens with no signal.
 // Bump VERSION whenever any file changes so phones pick up the new version.
-const VERSION = 'ride-log-v3';
+const VERSION = 'ride-log-v4';
 const FILES = [
   './', 'index.html', 'config.js', 'manifest.webmanifest', 'vendor/chart.umd.min.js', 'vendor/supabase.js',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png', 'icons/apple-touch-icon.png', 'icons/icon.svg',
