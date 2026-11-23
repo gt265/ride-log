@@ -7,8 +7,10 @@ It's a plain web app (HTML, CSS and JavaScript) with no build step, and you can 
 - Log rides and races: distance, moving time, power, heart rate, climbing, finishing position, notes
 - Dashboard: summary tiles, speed / power / heart-rate trend, weekly or monthly distance, sortable results table, personal bests, monthly goal
 - **Ride mode**: put your phone on the handlebars and it records speed, distance, moving time, climbing and your real fastest 10 km from GPS
+- **Accounts & cloud sync** (optional): sign in with email and password, and your rides and profile sync between phone and computer. Offline-first: everything saves on the phone first and syncs when you're back online. Setup: [`supabase/README.md`](supabase/README.md)
+- Profile (name, monthly goal, weight, FTP, max HR) and **light / dark / system** theme in Settings
 - CSV import and export
-- Works offline once installed; all data stays on your device (localStorage)
+- Works offline once installed
 
 ## Install on your phone
 Open the GitHub Pages link, then:
@@ -35,6 +37,9 @@ Then open http://localhost:8000. GPS and installing need `https://` (or `localho
 | File | Purpose |
 |---|---|
 | `index.html` | The whole app |
+| `config.js` | Supabase URL + publishable key (empty = accounts off) |
+| `supabase/` | Database setup script and step-by-step account setup |
+| `vendor/supabase.js` | supabase-js 2.45.4 (MIT), bundled for offline use |
 | `sw.js` | Offline cache. **Bump `VERSION` whenever you change any file** so installed copies update |
 | `manifest.webmanifest` | App name, icons and colours used when installing |
 | `vendor/chart.umd.min.js` | Chart.js 4.4.1 (MIT), bundled so charts work offline |

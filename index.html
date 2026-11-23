@@ -5,191 +5,357 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Ride Log</title>
 <meta name="description" content="Cycling results dashboard and phone bike computer.">
-<meta name="theme-color" content="#2a78d6">
+<meta name="theme-color" content="#f5f5f3" id="metaTheme">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Ride Log">
+<script src="config.js"></script>
 <script src="vendor/chart.umd.min.js"></script>
 <style>
 /* ============================================================
-   THEME TOKENS
+   THEME TOKENS  (light by default; dark via system or setting)
    ============================================================ */
 :root {
   color-scheme: light;
-  --bg: #f4f4f2;
-  --surface: #fcfcfb;
-  --surface-2: #f0efec;
-  --border: #e2e1dc;
-  --text: #0b0b0b;
-  --text-2: #52514e;
-  --text-3: #7a7974;
+  --bg: #f5f5f3;
+  --surface: #ffffff;
+  --surface-2: #f1f1ee;
+  --surface-3: #e9e8e4;
+  --border: #e6e5e0;
+  --text: #111110;
+  --text-2: #55544f;
+  --text-3: #8a8980;
   --grid: rgba(0,0,0,.07);
-  --accent: #2a78d6;        /* series 1: speed / distance */
-  --accent-soft: rgba(42,120,214,.12);
-  --power: #eb6834;         /* series 2 */
-  --hr: #1baf7a;            /* series 3 */
+  --accent: #2a78d6;          /* chart series 1 */
+  --accent-ink: #1f63b5;      /* accent used as text */
+  --accent-soft: rgba(42,120,214,.11);
+  --power: #eb6834;           /* chart series 2 */
+  --hr: #1baf7a;              /* chart series 3 */
   --good: #008300;
+  --warn: #c98500;
   --danger: #c93b3a;
-  --shadow: 0 1px 2px rgba(0,0,0,.05), 0 4px 14px rgba(0,0,0,.04);
-  --radius: 14px;
+  --hero-a: #1f63b5;
+  --hero-b: #2a78d6;
+  --hero-glow: #5aa0ee;
+  --shadow-sm: 0 1px 2px rgba(17,17,16,.04), 0 1px 1px rgba(17,17,16,.03);
+  --shadow: 0 1px 2px rgba(17,17,16,.04), 0 6px 20px rgba(17,17,16,.05);
+  --radius: 16px;
+  --appbar: rgba(245,245,243,.82);
+  --tabbar: rgba(255,255,255,.9);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --bg: #111110; --surface: #1a1a19; --surface-2: #232321; --border: #2f2f2c;
-    --text: #f0efec; --text-2: #c3c2b7; --text-3: #8f8e86; --grid: rgba(255,255,255,.08);
-    --accent: #3987e5; --accent-soft: rgba(57,135,229,.18);
-    --power: #d95926; --hr: #199e70; --good: #0ca30c; --danger: #e66767;
-    --shadow: 0 1px 2px rgba(0,0,0,.4);
+    --bg: #0e0e0d; --surface: #181817; --surface-2: #212120; --surface-3: #2a2a28; --border: #2c2c29;
+    --text: #f2f1ee; --text-2: #c3c2b7; --text-3: #8f8e86; --grid: rgba(255,255,255,.08);
+    --accent: #3987e5; --accent-ink: #7fb3f0; --accent-soft: rgba(57,135,229,.18);
+    --power: #d95926; --hr: #199e70; --good: #0ca30c; --warn: #e0a106; --danger: #e66767;
+    --hero-a: #163e70; --hero-b: #2160ad; --hero-glow: #3987e5;
+    --shadow-sm: none; --shadow: 0 1px 2px rgba(0,0,0,.5);
+    --appbar: rgba(14,14,13,.82); --tabbar: rgba(24,24,23,.92);
   }
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #111110; --surface: #1a1a19; --surface-2: #232321; --border: #2f2f2c;
-  --text: #f0efec; --text-2: #c3c2b7; --text-3: #8f8e86; --grid: rgba(255,255,255,.08);
-  --accent: #3987e5; --accent-soft: rgba(57,135,229,.18);
-  --power: #d95926; --hr: #199e70; --good: #0ca30c; --danger: #e66767;
-  --shadow: 0 1px 2px rgba(0,0,0,.4);
+  --bg: #0e0e0d; --surface: #181817; --surface-2: #212120; --surface-3: #2a2a28; --border: #2c2c29;
+  --text: #f2f1ee; --text-2: #c3c2b7; --text-3: #8f8e86; --grid: rgba(255,255,255,.08);
+  --accent: #3987e5; --accent-ink: #7fb3f0; --accent-soft: rgba(57,135,229,.18);
+  --power: #d95926; --hr: #199e70; --good: #0ca30c; --warn: #e0a106; --danger: #e66767;
+  --hero-a: #163e70; --hero-b: #2160ad; --hero-glow: #3987e5;
+  --shadow-sm: none; --shadow: 0 1px 2px rgba(0,0,0,.5);
+  --appbar: rgba(14,14,13,.82); --tabbar: rgba(24,24,23,.92);
 }
 
 * { box-sizing: border-box; }
 html, body { margin: 0; }
 body {
   background: var(--bg); color: var(--text);
-  font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  -webkit-font-smoothing: antialiased;
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent;
 }
-.wrap { max-width: 1180px; margin: 0 auto; padding: 20px 16px 60px; }
-
-/* ---------- header ---------- */
-header.top {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  flex-wrap: wrap; margin-bottom: 18px;
-}
-.brand { display: flex; align-items: center; gap: 10px; }
-.brand h1 { font-size: 1.35rem; margin: 0; letter-spacing: -.01em; }
-.brand svg { color: var(--accent); }
-.toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-
-button, .btn {
-  font: inherit; font-size: .9rem; cursor: pointer;
-  border: 1px solid var(--border); background: var(--surface); color: var(--text);
-  padding: 8px 14px; border-radius: 10px; transition: background .15s, border-color .15s;
-  display: inline-flex; align-items: center; gap: 6px;
-}
-button:hover, .btn:hover { background: var(--surface-2); }
-button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-button.primary:hover { filter: brightness(1.08); background: var(--accent); }
-button.ghost { background: transparent; }
-button.danger { color: var(--danger); }
-button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
-  outline: 2px solid var(--accent); outline-offset: 2px;
-}
-
-/* segmented control */
-.seg { display: inline-flex; background: var(--surface-2); border-radius: 10px; padding: 3px; gap: 2px; }
-.seg button { border: 0; background: transparent; padding: 6px 12px; border-radius: 8px; color: var(--text-2); }
-.seg button.on { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
-
-/* ---------- cards ---------- */
-.card {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px;
-}
-.card h2 { font-size: 1rem; margin: 0; }
-.card-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+svg.i { width: 20px; height: 20px; flex: none; }
+.hidden { display: none !important; }
+.muted { color: var(--text-3); }
 .sub { color: var(--text-3); font-size: .82rem; }
 
-.grid { display: grid; gap: 16px; }
-.tiles { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); margin-bottom: 16px; }
-.two { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); margin-bottom: 16px; }
-.grid > * { min-width: 0; }
-@media (max-width: 860px) { .two { grid-template-columns: minmax(0, 1fr); } }
-
-.tile { padding: 16px 18px; }
-.tile .label { color: var(--text-2); font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; }
-.tile .value { font-size: 1.75rem; font-weight: 650; margin-top: 4px; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
-.tile .value small { font-size: .95rem; font-weight: 500; color: var(--text-2); margin-left: 2px; }
-.tile .hint { color: var(--text-3); font-size: .8rem; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-.chart-box { position: relative; height: 290px; }
-
-/* filter bar */
-.filterbar {
-  display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
-  margin-bottom: 16px;
+/* ---------- buttons & inputs ---------- */
+button, .btn {
+  font: inherit; font-size: .92rem; font-weight: 550; cursor: pointer;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text);
+  padding: 9px 15px; border-radius: 11px; transition: background .15s, border-color .15s, transform .1s;
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px; white-space: nowrap;
 }
-.filterbar .sub { margin-left: auto; }
-
-/* goal */
-.goal { display: flex; flex-direction: column; gap: 10px; }
-.goal-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
-.goal-big { font-size: 1.5rem; font-weight: 650; font-variant-numeric: tabular-nums; }
-.bar { height: 12px; background: var(--surface-2); border-radius: 99px; overflow: hidden; }
-.bar > span { display: block; height: 100%; background: var(--accent); border-radius: 99px; transition: width .6s cubic-bezier(.2,.8,.2,1); }
-.bar.done > span { background: var(--good); }
-.goal input { width: 90px; }
-
-/* PBs */
-.pbs { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
-.pb { background: var(--surface-2); border-radius: 12px; padding: 14px; }
-.pb .label { font-size: .8rem; color: var(--text-2); display: flex; align-items: center; gap: 6px; }
-.pb .value { font-size: 1.35rem; font-weight: 650; margin: 4px 0 2px; font-variant-numeric: tabular-nums; }
-.pb .meta { font-size: .8rem; color: var(--text-3); }
-
-/* ---------- table ---------- */
-.table-filters { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; align-items: end; }
-.table-filters label { display: flex; flex-direction: column; gap: 4px; font-size: .78rem; color: var(--text-2); }
-.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-table { width: 100%; border-collapse: collapse; font-size: .88rem; font-variant-numeric: tabular-nums; }
-th, td { padding: 10px 10px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
-th { font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text-2); font-weight: 600; cursor: pointer; user-select: none; position: sticky; top: 0; background: var(--surface); }
-th.nosort { cursor: default; }
-th .arrow { opacity: .35; margin-left: 3px; }
-th.sorted .arrow { opacity: 1; color: var(--accent); }
-td.num, th.num { text-align: right; }
-tbody tr:hover { background: var(--surface-2); }
-td.name { white-space: normal; min-width: 160px; }
-td.name .note { color: var(--text-3); font-size: .78rem; display: block; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pill { display: inline-block; padding: 2px 9px; border-radius: 99px; font-size: .75rem; font-weight: 600; background: var(--surface-2); color: var(--text-2); }
-.pill.race { background: var(--accent-soft); color: var(--accent); }
-.pos { font-weight: 650; }
-.pos.p1 { color: var(--good); }
-.row-actions button { padding: 4px 8px; font-size: .8rem; }
-.empty { text-align: center; color: var(--text-3); padding: 28px 8px; white-space: normal; }
-
-/* ---------- form / dialog ---------- */
-dialog {
-  border: 1px solid var(--border); border-radius: 16px; padding: 0; width: min(620px, calc(100vw - 32px));
-  background: var(--surface); color: var(--text); box-shadow: 0 20px 60px rgba(0,0,0,.3);
-}
-dialog::backdrop { background: rgba(0,0,0,.45); backdrop-filter: blur(2px); }
-dialog form { padding: 20px; }
-dialog h2 { margin: 0 0 14px; font-size: 1.1rem; }
-.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.form-grid .full { grid-column: 1 / -1; }
-@media (max-width: 520px) { .form-grid { grid-template-columns: 1fr; } }
-.field { display: flex; flex-direction: column; gap: 4px; }
-.field span { font-size: .8rem; color: var(--text-2); font-weight: 500; }
-.field span em { font-style: normal; color: var(--text-3); font-weight: 400; }
-input, select, textarea {
-  font: inherit; font-size: .92rem; color: var(--text); background: var(--surface-2);
-  border: 1px solid var(--border); border-radius: 9px; padding: 8px 10px; width: 100%;
-}
-textarea { resize: vertical; min-height: 64px; }
-.field.invalid input { border-color: var(--danger); }
-.err { color: var(--danger); font-size: .78rem; min-height: 1em; }
-.form-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
-.hidden { display: none !important; }
-
-/* ---------- live ride mode ---------- */
+button:hover { background: var(--surface-2); }
+button:active { transform: scale(.98); }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.primary:hover { background: var(--accent); filter: brightness(1.08); }
+button.ghost { background: transparent; border-color: transparent; }
+button.ghost:hover { background: var(--surface-2); }
+button.danger { color: var(--danger); }
+button.danger-solid { background: var(--danger); border-color: var(--danger); color: #fff; }
 button.go { background: var(--good); border-color: var(--good); color: #fff; }
 button.go:hover { background: var(--good); filter: brightness(1.08); }
-#btnRide.rec { background: var(--danger); border-color: var(--danger); color: #fff; }
+button.sm { padding: 6px 11px; font-size: .84rem; border-radius: 9px; }
+button[disabled] { opacity: .55; cursor: default; }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, a:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+a { color: var(--accent-ink); }
+input, select, textarea {
+  font: inherit; font-size: 16px; /* 16px stops iOS zooming into fields */
+  color: var(--text); background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: 11px; padding: 10px 12px; width: 100%;
+}
+input:focus, select:focus, textarea:focus { border-color: var(--accent); background: var(--surface); outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
+textarea { resize: vertical; min-height: 70px; }
+select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
+
+/* segmented control */
+.seg { display: inline-flex; background: var(--surface-2); border-radius: 11px; padding: 3px; gap: 2px; }
+.seg button { border: 0; background: transparent; padding: 6px 12px; border-radius: 8px; color: var(--text-2); font-size: .86rem; }
+.seg button.on { background: var(--surface); color: var(--text); box-shadow: var(--shadow-sm), 0 0 0 1px var(--border); }
+.seg.full { display: flex; } .seg.full button { flex: 1; }
+
+/* ---------- app bar & navigation ---------- */
+.appbar {
+  position: sticky; top: 0; z-index: 20;
+  background: var(--bg); background: var(--appbar);
+  -webkit-backdrop-filter: saturate(1.6) blur(14px); backdrop-filter: saturate(1.6) blur(14px);
+  border-bottom: 1px solid var(--border);
+}
+.appbar-in { max-width: 1180px; margin: 0 auto; display: flex; align-items: center; gap: 12px; padding: 10px 16px; padding-top: max(10px, env(safe-area-inset-top)); }
+.logo { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.08rem; letter-spacing: -.01em; color: var(--text); text-decoration: none; }
+.logo-mark { width: 32px; height: 32px; border-radius: 9px; background: linear-gradient(135deg, var(--hero-a), var(--hero-b)); color: #fff; display: grid; place-items: center; }
+.logo-mark svg { width: 21px; height: 21px; }
+.tabs { display: flex; gap: 2px; margin-left: 18px; }
+.tab { border: 0; background: transparent; color: var(--text-2); padding: 8px 13px; border-radius: 10px; font-weight: 550; position: relative; }
+.tab:hover { background: var(--surface-2); }
+.tab.on { color: var(--text); background: var(--surface-2); }
+.tab .ride-bubble { display: contents; }
+.tab-ride { color: #fff; background: var(--good); margin-left: 6px; }
+.tab-ride:hover { background: var(--good); filter: brightness(1.08); }
+.tab-ride.rec { background: var(--danger); }
+.appbar-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.sync-chip { display: flex; align-items: center; gap: 7px; font-size: .8rem; color: var(--text-2); border: 0; background: transparent; padding: 6px 8px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-3); display: inline-block; flex: none; }
+.dot.ok { background: var(--good); } .dot.warn { background: var(--warn); } .dot.bad { background: var(--danger); }
+.dot.spin { background: var(--accent); animation: blink 1s infinite; }
+.avatar { width: 36px; height: 36px; padding: 0; border-radius: 50%; border: 0; background: var(--accent-soft); color: var(--accent-ink); font-weight: 700; font-size: .9rem; flex: none; }
+.avatar.lg { width: 52px; height: 52px; font-size: 1.15rem; display: grid; place-items: center; }
+
+@media (max-width: 760px) {
+  /* a blur on the header would trap the fixed tab bar inside it */
+  .appbar { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--bg); }
+  .tabs {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; margin: 0;
+    background: var(--surface); background: var(--tabbar);
+    -webkit-backdrop-filter: saturate(1.6) blur(16px); backdrop-filter: saturate(1.6) blur(16px);
+    border-top: 1px solid var(--border);
+    padding: 6px 6px max(8px, env(safe-area-inset-bottom)); justify-content: space-around; gap: 0;
+  }
+  .tab { flex: 1; flex-direction: column; gap: 3px; font-size: .68rem; padding: 5px 4px; background: transparent !important; color: var(--text-3); }
+  .tab.on { color: var(--accent-ink); }
+  .tab svg.i { width: 24px; height: 24px; }
+  .tab-ride { margin: 0; color: var(--text-3); background: transparent; }
+  .tab-ride .ride-bubble { display: grid; place-items: center; width: 52px; height: 52px; margin: -26px auto 0; border-radius: 50%; background: var(--good); color: #fff; box-shadow: 0 6px 16px rgba(0,131,0,.35), 0 0 0 5px var(--bg); }
+  .tab-ride.rec .ride-bubble { background: var(--danger); box-shadow: 0 6px 16px rgba(201,59,58,.35), 0 0 0 5px var(--bg); animation: pulse 1.6s infinite; }
+  .tab-ride.rec { background: transparent; }
+  .tab-ride .ride-bubble svg.i { width: 26px; height: 26px; }
+  .sync-chip .txt { display: none; }
+  .tabs .label-desk { display: none; }
+  main { padding-bottom: calc(96px + env(safe-area-inset-bottom)) !important; }
+}
+@media (min-width: 761px) { .tabs .label-mob { display: none; } .tab svg.i { display: none; } .tab-ride svg.i { display: inline; width: 16px; height: 16px; } }
+@keyframes blink { 50% { opacity: .3; } }
+@keyframes pulse { 50% { box-shadow: 0 6px 16px rgba(201,59,58,.35), 0 0 0 9px var(--bg); } }
+
+main { max-width: 1180px; margin: 0 auto; padding: 20px 16px 60px; }
+.view { animation: fade .25s ease; }
+@keyframes fade { from { opacity: 0; transform: translateY(4px); } }
+.view-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 4px 0 16px; }
+.view-head h1 { font-size: 1.6rem; margin: 0; letter-spacing: -.02em; }
+
+/* ---------- cards ---------- */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px; }
+.card h2 { font-size: 1rem; margin: 0; letter-spacing: -.01em; }
+.card-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.grid { display: grid; gap: 14px; }
+.grid > * { min-width: 0; }
+.two { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); margin-bottom: 14px; }
+@media (max-width: 860px) { .two { grid-template-columns: minmax(0, 1fr); } }
+.section-title { display: flex; justify-content: space-between; align-items: baseline; margin: 26px 2px 12px; }
+.section-title h2 { font-size: 1.08rem; margin: 0; letter-spacing: -.01em; }
+
+/* ---------- hero ---------- */
+.hero {
+  position: relative; overflow: hidden; color: #fff; border-radius: 22px; padding: 24px;
+  background: radial-gradient(110% 130% at 100% 0%, var(--hero-glow) 0%, transparent 55%), linear-gradient(135deg, var(--hero-a), var(--hero-b));
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 20px; align-items: center; margin-bottom: 16px;
+  box-shadow: 0 10px 30px rgba(31,99,181,.25);
+}
+.hero::after { content: ""; position: absolute; right: -60px; bottom: -80px; width: 260px; height: 260px; border-radius: 50%; border: 36px solid rgba(255,255,255,.06); pointer-events: none; }
+.hero .eyebrow { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; opacity: .8; font-weight: 600; }
+.hero h1 { margin: 4px 0 6px; font-size: clamp(1.45rem, 5vw, 2rem); letter-spacing: -.02em; line-height: 1.15; }
+.hero p { margin: 0; opacity: .88; font-size: .95rem; max-width: 46ch; }
+.hero-actions { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; position: relative; z-index: 1; }
+.hero .btn-light { background: #fff; color: #174f92; border: 0; }
+.hero .btn-light:hover { background: #fff; filter: brightness(.96); }
+.hero .btn-glass { background: rgba(255,255,255,.14); color: #fff; border: 1px solid rgba(255,255,255,.3); }
+.hero .btn-glass:hover { background: rgba(255,255,255,.22); }
+.ring { position: relative; width: 140px; height: 140px; flex: none; z-index: 1; border: 0; padding: 0; background: transparent; color: #fff; border-radius: 50%; }
+.ring:hover { background: transparent; }
+.ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.ring .track { stroke: rgba(255,255,255,.2); }
+.ring .prog { stroke: #fff; transition: stroke-dashoffset .9s cubic-bezier(.2,.8,.2,1); }
+.ring .center { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
+.ring .big { font-size: 1.7rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.ring .small { font-size: .74rem; opacity: .85; margin-top: 3px; }
+@media (max-width: 520px) {
+  .hero { padding: 20px; gap: 14px; }
+  .ring { width: 108px; height: 108px; }
+  .ring .big { font-size: 1.35rem; }
+  .hero-actions button { flex: 1; }
+  .hero-actions { grid-column: 1 / -1; margin-top: 4px; }
+}
+
+/* ---------- toolbar row (range) ---------- */
+.rowbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin: 20px 0 14px; }
+.rowbar .sub { margin-left: auto; }
+@media (max-width: 520px) { .rowbar .seg { display: flex; width: 100%; } .rowbar .seg button { flex: 1; } .rowbar .sub { margin-left: 0; } }
+
+/* ---------- stat tiles ---------- */
+.tiles { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); margin-bottom: 14px; }
+@media (max-width: 520px) { .tiles { grid-template-columns: 1fr 1fr; gap: 10px; } }
+.tile { padding: 14px 16px; }
+.tile .label { display: flex; align-items: center; gap: 7px; color: var(--text-2); font-size: .78rem; font-weight: 550; }
+.tile .label svg { width: 16px; height: 16px; color: var(--accent); }
+.tile .value { font-size: 1.6rem; font-weight: 700; margin-top: 6px; letter-spacing: -.03em; font-variant-numeric: tabular-nums; line-height: 1.15; }
+.tile .value small { font-size: .9rem; font-weight: 550; color: var(--text-2); margin-left: 3px; letter-spacing: 0; }
+.tile .hint { color: var(--text-3); font-size: .78rem; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---------- charts ---------- */
+.chart-box { position: relative; height: 280px; }
+.chart-empty { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; color: var(--text-3); font-size: .9rem; padding: 20px; }
+@media (max-width: 520px) { .chart-box { height: 230px; } .card-head .seg { width: 100%; display: flex; } .card-head .seg button { flex: 1; } }
+
+/* ---------- personal bests ---------- */
+.pbs { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 900px) { .pbs { grid-template-columns: 1fr 1fr; gap: 10px; } }
+.pb { padding: 14px 16px; position: relative; overflow: hidden; }
+.pb .label { font-size: .78rem; color: var(--text-2); font-weight: 550; display: flex; align-items: center; gap: 7px; }
+.pb .label .ic { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent-ink); }
+.pb .label .ic svg { width: 15px; height: 15px; }
+.pb .value { font-size: 1.35rem; font-weight: 700; margin: 8px 0 2px; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.pb .meta { font-size: .78rem; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+
+/* ---------- ride cards (mobile list + recent) ---------- */
+.ride-list { display: grid; gap: 10px; }
+@media (min-width: 861px) { #recent { grid-template-columns: repeat(3, minmax(0, 1fr)); } #recent .empty-card { grid-column: 1 / -1; } }
+.ride-card { display: block; width: 100%; text-align: left; white-space: normal; padding: 14px 16px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-sm); font-weight: 400; }
+.ride-card:hover { background: var(--surface); border-color: var(--text-3); }
+.rc-top { display: flex; align-items: center; gap: 8px; font-size: .78rem; color: var(--text-3); }
+.rc-top .pos { margin-left: auto; }
+.rc-name { font-weight: 650; font-size: 1rem; margin: 5px 0 8px; color: var(--text); }
+.rc-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.rc-stats div { font-variant-numeric: tabular-nums; font-weight: 650; font-size: .98rem; color: var(--text); }
+.rc-stats span { display: block; font-size: .68rem; color: var(--text-3); font-weight: 500; text-transform: uppercase; letter-spacing: .04em; }
+.rc-notes { margin-top: 8px; font-size: .84rem; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pill { display: inline-block; padding: 2px 9px; border-radius: 99px; font-size: .72rem; font-weight: 650; background: var(--surface-2); color: var(--text-2); }
+.pill.race { background: var(--accent-soft); color: var(--accent-ink); }
+.pill.group { background: rgba(27,175,122,.12); color: var(--hr); }
+.pos { font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+.pos.p1 { color: #fff; background: var(--good); padding: 1px 8px; border-radius: 99px; }
+.pos.pod { color: var(--accent-ink); }
+
+/* ---------- empty state ---------- */
+.empty { text-align: center; color: var(--text-3); padding: 34px 16px; white-space: normal; }
+.empty-card { text-align: center; padding: 36px 20px; }
+.empty-card .ic { width: 56px; height: 56px; border-radius: 16px; margin: 0 auto 12px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent-ink); }
+.empty-card .ic svg { width: 28px; height: 28px; }
+.empty-card h3 { margin: 0 0 4px; font-size: 1.05rem; }
+.empty-card p { margin: 0 auto 16px; color: var(--text-2); max-width: 40ch; font-size: .92rem; }
+
+/* ---------- rides view ---------- */
+.filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin-bottom: 14px; }
+.filters label { display: flex; flex-direction: column; gap: 5px; font-size: .76rem; color: var(--text-2); font-weight: 550; flex: 1 1 140px; }
+.filters .grow { flex: 2 1 200px; }
+.filters input, .filters select { padding: 8px 11px; }
+details.filter-wrap > summary { list-style: none; cursor: pointer; display: none; }
+details.filter-wrap > summary::-webkit-details-marker { display: none; }
+@media (max-width: 760px) {
+  details.filter-wrap > summary { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: .9rem; padding: 10px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); margin-bottom: 12px; }
+  details.filter-wrap > summary .count { margin-left: auto; color: var(--text-3); font-weight: 500; }
+  details.filter-wrap:not([open]) .filters { display: none; }
+}
+.table-card { padding: 6px 0 0; overflow: hidden; }
+.table-scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: .88rem; font-variant-numeric: tabular-nums; }
+th, td { padding: 11px 12px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+tbody tr:last-child td { border-bottom: 0; }
+th { font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: var(--text-3); font-weight: 650; cursor: pointer; user-select: none; }
+th:first-child, td:first-child { padding-left: 18px; } th:last-child, td:last-child { padding-right: 18px; }
+th .arrow { opacity: .35; margin-left: 3px; }
+th.sorted { color: var(--text); } th.sorted .arrow { opacity: 1; color: var(--accent); }
+td.num, th.num { text-align: right; }
+tbody tr { cursor: pointer; transition: background .12s; }
+tbody tr:hover { background: var(--surface-2); }
+td.name { white-space: normal; min-width: 180px; font-weight: 600; }
+td.name .note { color: var(--text-3); font-size: .78rem; display: block; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 400; }
+.only-desk { display: block; } .only-mob { display: none; }
+@media (max-width: 760px) { .only-desk { display: none; } .only-mob { display: block; } }
+
+/* ---------- settings ---------- */
+.settings { max-width: 720px; display: grid; gap: 14px; }
+.set-card h2 { display: flex; align-items: center; gap: 9px; margin-bottom: 4px; }
+.set-card h2 svg { width: 18px; height: 18px; color: var(--accent); }
+.set-card > .sub { margin: 0 0 16px; }
+.set-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 0; border-top: 1px solid var(--border); }
+.set-row:first-of-type { border-top: 0; }
+.set-row .t { font-weight: 550; } .set-row .d { font-size: .82rem; color: var(--text-3); }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.form-grid .full { grid-column: 1 / -1; }
+@media (max-width: 520px) { .form-grid { grid-template-columns: 1fr; } .set-row { flex-wrap: wrap; } }
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field > span { font-size: .8rem; color: var(--text-2); font-weight: 550; }
+.field > span em { font-style: normal; color: var(--text-3); font-weight: 400; }
+.field.invalid input { border-color: var(--danger); }
+.err { color: var(--danger); font-size: .82rem; min-height: 1.1em; margin-top: 8px; }
+.ok-msg { color: var(--good); font-size: .85rem; margin-top: 8px; }
+.acct { display: flex; align-items: center; gap: 14px; }
+.acct .who { min-width: 0; } .acct .who b { display: block; overflow: hidden; text-overflow: ellipsis; }
+.btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+.link-btn { border: 0; background: none; padding: 0; color: var(--accent-ink); font-weight: 550; font-size: .86rem; }
+.link-btn:hover { background: none; text-decoration: underline; }
+.theme-pick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.theme-opt { flex-direction: column; gap: 8px; padding: 10px; border-radius: 14px; font-size: .85rem; }
+.theme-opt.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.swatch { width: 100%; height: 54px; border-radius: 9px; border: 1px solid var(--border); overflow: hidden; display: grid; grid-template-rows: 14px 1fr; }
+.swatch.l { background: #f5f5f3; } .swatch.l i { background: #fff; border-bottom: 1px solid #e6e5e0; }
+.swatch.d { background: #0e0e0d; } .swatch.d i { background: #181817; border-bottom: 1px solid #2c2c29; }
+.swatch.s { background: linear-gradient(90deg, #f5f5f3 50%, #0e0e0d 50%); } .swatch.s i { background: linear-gradient(90deg, #fff 50%, #181817 50%); }
+.swatch b { display: block; width: 40%; height: 8px; border-radius: 4px; background: #2a78d6; margin: 10px; }
+
+/* ---------- dialog ---------- */
+dialog {
+  border: 1px solid var(--border); border-radius: 20px; padding: 0; width: min(620px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px); overflow: auto;
+  background: var(--surface); color: var(--text); box-shadow: 0 24px 70px rgba(0,0,0,.3);
+}
+dialog::backdrop { background: rgba(10,10,10,.5); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
+dialog form { padding: 22px; }
+dialog h2 { margin: 0 0 16px; font-size: 1.15rem; }
+.form-actions { display: flex; gap: 8px; margin-top: 18px; align-items: center; }
+.form-actions .spacer { flex: 1; }
+@media (max-width: 520px) {
+  dialog { margin: auto auto 0; width: 100%; max-width: 100%; border-radius: 20px 20px 0 0; border-bottom: 0; }
+  dialog form { padding-bottom: max(22px, env(safe-area-inset-bottom)); }
+}
+
+/* ---------- live ride mode ---------- */
 .live {
   position: fixed; inset: 0; z-index: 50; background: var(--bg); color: var(--text);
   display: flex; flex-direction: column; padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
@@ -197,163 +363,165 @@ button.go:hover { background: var(--good); filter: brightness(1.08); }
 }
 .live-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 .live-status { font-size: .85rem; color: var(--text-2); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--text-3); display: inline-block; }
-.dot.ok { background: var(--good); } .dot.warn { background: #eda100; } .dot.bad { background: var(--danger); }
+.live .dot { width: 10px; height: 10px; }
 .dot.rec { background: var(--danger); animation: blink 1.2s infinite; }
-@keyframes blink { 50% { opacity: .25; } }
 .live-main { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 14px; max-width: 640px; width: 100%; margin: 0 auto; padding: 12px 0; }
 .live-speed { text-align: center; }
 .live-speed .v { font-size: clamp(5rem, 28vw, 9rem); font-weight: 700; line-height: 1; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
 .live-speed .u { color: var(--text-2); font-size: 1.1rem; }
 .live-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.live-cell { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; }
+.live-cell { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 12px 14px; }
 .live-cell .l { font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; color: var(--text-2); }
-.live-cell .v { font-size: clamp(1.6rem, 8vw, 2.4rem); font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.live-cell .v { font-size: clamp(1.6rem, 8vw, 2.4rem); font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
 .live-cell .v small { font-size: .9rem; color: var(--text-2); font-weight: 500; margin-left: 3px; }
-.live-msg { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--danger); border-radius: 10px; padding: 12px 14px; font-size: .9rem; }
+.live-msg { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--danger); border-radius: 12px; padding: 12px 14px; font-size: .9rem; }
 .live-msg.info { border-left-color: var(--accent); }
 .live-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; max-width: 640px; width: 100%; margin: 0 auto; }
-.live-actions button { justify-content: center; font-size: 1.15rem; font-weight: 600; min-height: 64px; border-radius: 16px; }
+.live-actions button { font-size: 1.15rem; font-weight: 650; min-height: 64px; border-radius: 18px; }
 .live-actions button.wide { grid-column: 1 / -1; }
 
 .toast {
-  position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%) translateY(20px);
-  background: var(--text); color: var(--surface); padding: 10px 16px; border-radius: 10px;
-  font-size: .9rem; opacity: 0; transition: .25s; pointer-events: none; z-index: 99;
+  position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%) translateY(20px);
+  background: var(--text); color: var(--bg); padding: 11px 18px; border-radius: 12px; max-width: calc(100vw - 32px);
+  font-size: .9rem; font-weight: 550; opacity: 0; transition: .25s; pointer-events: none; z-index: 99; box-shadow: 0 8px 24px rgba(0,0,0,.2);
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-
-@media (max-width: 520px) {
-  .tile .value { font-size: 1.45rem; }
-  .chart-box { height: 240px; }
-  .filterbar .sub { margin-left: 0; width: 100%; }
-}
+@media (max-width: 760px) { .toast { bottom: calc(96px + env(safe-area-inset-bottom)); } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 </style>
 </head>
 <body>
-<div class="wrap">
 
-  <header class="top">
-    <div class="brand">
-      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <circle cx="5.5" cy="17" r="3.5"/><circle cx="18.5" cy="17" r="3.5"/>
-        <path d="M5.5 17 9 9h6l3.5 8M9 9 12 17h-1M15 9l-1.5-3H11"/>
-      </svg>
-      <div><h1>Ride Log</h1><div class="sub" id="syncLabel">Saved on this device</div></div>
-    </div>
-    <div class="toolbar">
-      <button class="go" id="btnRide">▶ Ride</button>
-      <button class="primary" id="btnAdd">+ Add ride</button>
-      <button id="btnImport" title="Import CSV">Import CSV</button>
-      <button id="btnExport" title="Export CSV">Export CSV</button>
-      <button id="btnInstall" class="hidden" title="Install as an app">⤓ Install app</button>
-      <button id="btnTheme" class="ghost" aria-label="Toggle dark mode" title="Toggle dark mode">🌙</button>
-      <input type="file" id="fileInput" accept=".csv,text/csv" class="hidden">
-    </div>
-  </header>
+<!-- icon sprite -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-bike" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.5" cy="17" r="3.5"/><circle cx="18.5" cy="17" r="3.5"/><path d="M5.5 17 9 9h6l3.5 8M9 9 12 17h-1M15 9l-1.5-3H11"/></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1"/><circle cx="3.5" cy="12" r="1"/><circle cx="3.5" cy="18" r="1"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-road" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21 9 3M20 21 15 3M12 6v2M12 11v2M12 16v3"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-mount" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m2 20 7-12 4 6 3-4 6 10z"/></symbol>
+    <symbol id="i-flag" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></symbol>
+    <symbol id="i-trophy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4"/></symbol>
+    <symbol id="i-ruler" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h18M3 12l4-4M3 12l4 4M21 12l-4-4M21 12l-4 4"/></symbol>
+    <symbol id="i-bolt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+    <symbol id="i-cloud" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18a5 5 0 1 1 .9-9.9A6 6 0 0 1 19 10a4 4 0 0 1-1 8z"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+    <symbol id="i-db" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></symbol>
+    <symbol id="i-phone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/></symbol>
+  </defs>
+</svg>
 
-  <!-- date range filter -->
-  <div class="filterbar">
-    <div class="seg" id="rangeSeg" role="group" aria-label="Date range">
-      <button data-range="30">Last 30 days</button>
-      <button data-range="season">This season</button>
-      <button data-range="all">All time</button>
+<header class="appbar">
+  <div class="appbar-in">
+    <a class="logo" href="#home"><span class="logo-mark"><svg class="i"><use href="#i-bike"/></svg></span>Ride Log</a>
+    <nav class="tabs" aria-label="Main">
+      <button class="tab" data-view="home"><svg class="i"><use href="#i-home"/></svg><span>Home</span></button>
+      <button class="tab" data-view="rides"><svg class="i"><use href="#i-list"/></svg><span>Rides</span></button>
+      <button class="tab tab-ride" id="btnRide"><span class="ride-bubble"><svg class="i"><use href="#i-play"/></svg></span><span id="rideLabel">Ride</span></button>
+      <button class="tab" data-view="settings"><svg class="i"><use href="#i-gear"/></svg><span>Settings</span></button>
+    </nav>
+    <div class="appbar-right">
+      <button class="sync-chip" id="syncChip" title="Sync status"><span class="dot" id="syncDot"></span><span class="txt" id="syncLabel">On this device</span></button>
+      <button class="avatar" id="avatarBtn" aria-label="Account and settings">?</button>
     </div>
-    <span class="sub" id="rangeLabel"></span>
   </div>
+</header>
 
-  <!-- summary tiles -->
-  <section class="grid tiles" id="tiles"></section>
-
-  <!-- charts -->
-  <section class="grid two">
-    <div class="card">
-      <div class="card-head">
-        <div>
-          <h2 id="trendTitle">Average speed</h2>
-          <div class="sub" id="trendSub">km/h per ride</div>
-        </div>
-        <div class="seg" id="metricSeg" role="group" aria-label="Trend metric">
-          <button data-metric="speed">Speed</button>
-          <button data-metric="power">Power</button>
-          <button data-metric="hr">Heart rate</button>
+<main>
+  <!-- ======================= HOME ======================= -->
+  <section class="view" id="view-home">
+    <div class="hero">
+      <div>
+        <div class="eyebrow" id="heroDate"></div>
+        <h1 id="heroTitle">Good morning</h1>
+        <p id="heroText"></p>
+        <div class="hero-actions">
+          <button class="btn-light" id="heroRide"><svg class="i"><use href="#i-play"/></svg>Start ride</button>
+          <button class="btn-glass" id="heroAdd"><svg class="i"><use href="#i-plus"/></svg>Add ride</button>
         </div>
       </div>
-      <div class="chart-box"><canvas id="trendChart" aria-label="Trend chart"></canvas></div>
+      <button class="ring" id="goalRing" title="Monthly goal (change it in Settings)" aria-label="Monthly goal progress">
+        <svg viewBox="0 0 120 120"><circle class="track" cx="60" cy="60" r="52" fill="none" stroke-width="10"/><circle class="prog" id="ringProg" cx="60" cy="60" r="52" fill="none" stroke-width="10" stroke-linecap="round" stroke-dasharray="326.7" stroke-dashoffset="326.7"/></svg>
+        <span class="center"><span class="big" id="ringKm">0</span><span class="small" id="ringOf">of 500 km</span></span>
+      </button>
     </div>
-    <div class="card">
-      <div class="card-head">
-        <div>
-          <h2>Distance</h2>
-          <div class="sub" id="volSub">km per week</div>
-        </div>
-        <div class="seg" id="periodSeg" role="group" aria-label="Distance period">
-          <button data-period="week">Weekly</button>
-          <button data-period="month">Monthly</button>
-        </div>
+
+    <div class="rowbar">
+      <div class="seg" id="rangeSeg" role="group" aria-label="Date range">
+        <button data-range="30">30 days</button>
+        <button data-range="season">This season</button>
+        <button data-range="all">All time</button>
       </div>
-      <div class="chart-box"><canvas id="volChart" aria-label="Distance chart"></canvas></div>
+      <span class="sub" id="rangeLabel"></span>
     </div>
+
+    <section class="grid tiles" id="tiles"></section>
+
+    <section class="grid two">
+      <div class="card">
+        <div class="card-head">
+          <div><h2 id="trendTitle">Average speed</h2><div class="sub" id="trendSub">km/h per ride</div></div>
+          <div class="seg" id="metricSeg" role="group" aria-label="Trend metric">
+            <button data-metric="speed">Speed</button><button data-metric="power">Power</button><button data-metric="hr">Heart rate</button>
+          </div>
+        </div>
+        <div class="chart-box"><canvas id="trendChart" aria-label="Trend chart"></canvas><div class="chart-empty hidden" id="trendEmpty"></div></div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <div><h2>Distance</h2><div class="sub" id="volSub">km per week</div></div>
+          <div class="seg" id="periodSeg" role="group" aria-label="Distance period">
+            <button data-period="week">Weekly</button><button data-period="month">Monthly</button>
+          </div>
+        </div>
+        <div class="chart-box"><canvas id="volChart" aria-label="Distance chart"></canvas><div class="chart-empty hidden" id="volEmpty"></div></div>
+      </div>
+    </section>
+
+    <div class="section-title"><h2>Personal bests</h2><span class="sub">All time</span></div>
+    <section class="grid pbs" id="pbs"></section>
+
+    <div class="section-title"><h2>Recent rides</h2><a href="#rides" class="sub" style="color:var(--accent-ink);font-weight:600;text-decoration:none">See all →</a></div>
+    <section class="ride-list" id="recent"></section>
   </section>
 
-  <!-- goal + PBs -->
-  <section class="grid two">
-    <div class="card goal">
-      <div class="card-head" style="margin-bottom:0">
-        <div>
-          <h2>Monthly goal</h2>
-          <div class="sub" id="goalMonth"></div>
-        </div>
-        <label class="sub" style="display:flex;align-items:center;gap:6px">Target
-          <input type="number" id="goalInput" min="1" step="10"> km
+  <!-- ======================= RIDES ======================= -->
+  <section class="view hidden" id="view-rides">
+    <div class="view-head">
+      <div><h1>Rides</h1><div class="sub" id="tableCount"></div></div>
+      <button class="primary" id="btnAdd"><svg class="i"><use href="#i-plus"/></svg>Add ride</button>
+    </div>
+    <details class="filter-wrap" id="filterWrap">
+      <summary>Filter &amp; sort <span class="count" id="filterCount"></span></summary>
+      <div class="filters">
+        <label>Type
+          <select id="fType"><option value="">All types</option><option value="race">Race</option><option value="training">Training ride</option><option value="group">Group ride</option></select>
         </label>
+        <label>Position
+          <select id="fPos"><option value="">Any</option><option value="1">Wins</option><option value="3">Podium (top 3)</option><option value="10">Top 10</option></select>
+        </label>
+        <label>From <input type="date" id="fFrom"></label>
+        <label>To <input type="date" id="fTo"></label>
+        <label class="grow">Search <input type="search" id="fText" placeholder="Name or notes"></label>
+        <label class="only-mob">Sort by
+          <select id="fSort">
+            <option value="date:-1">Newest first</option><option value="date:1">Oldest first</option>
+            <option value="distance:-1">Longest</option><option value="speed:-1">Fastest</option>
+            <option value="elevation:-1">Most climbing</option><option value="position:1">Best finish</option>
+          </select>
+        </label>
+        <button class="ghost sm" id="fReset">Reset</button>
       </div>
-      <div class="goal-row">
-        <div class="goal-big" id="goalDone"></div>
-        <div class="sub" id="goalLeft"></div>
-      </div>
-      <div class="bar" id="goalBar" role="progressbar" aria-valuemin="0" aria-valuemax="100"><span></span></div>
-      <div class="sub" id="goalPace"></div>
-    </div>
-    <div class="card">
-      <div class="card-head" style="margin-bottom:12px">
-        <div><h2>Personal bests</h2><div class="sub">All time · updates automatically</div></div>
-      </div>
-      <div class="grid pbs" id="pbs"></div>
-    </div>
-  </section>
-
-  <!-- results table -->
-  <section class="card">
-    <div class="card-head">
-      <div><h2>Results</h2><div class="sub" id="tableCount"></div></div>
-    </div>
-    <div class="table-filters">
-      <label>Type
-        <select id="fType">
-          <option value="">All types</option>
-          <option value="race">Race</option>
-          <option value="training">Training ride</option>
-          <option value="group">Group ride</option>
-        </select>
-      </label>
-      <label>Position
-        <select id="fPos">
-          <option value="">Any</option>
-          <option value="1">Wins</option>
-          <option value="3">Podium (top 3)</option>
-          <option value="10">Top 10</option>
-        </select>
-      </label>
-      <label>From <input type="date" id="fFrom"></label>
-      <label>To <input type="date" id="fTo"></label>
-      <label>Search <input type="search" id="fText" placeholder="Name or notes"></label>
-      <button class="ghost" id="fReset">Reset</button>
-    </div>
-    <div class="table-scroll">
-      <table>
-        <thead>
-          <tr>
+    </details>
+    <div class="card table-card only-desk">
+      <div class="table-scroll">
+        <table>
+          <thead><tr>
             <th data-key="date">Date<span class="arrow">↕</span></th>
             <th data-key="name">Ride<span class="arrow">↕</span></th>
             <th data-key="type">Type<span class="arrow">↕</span></th>
@@ -364,40 +532,87 @@ button.go:hover { background: var(--good); filter: brightness(1.08); }
             <th data-key="hr" class="num">BPM<span class="arrow">↕</span></th>
             <th data-key="elevation" class="num">Elev m<span class="arrow">↕</span></th>
             <th data-key="position" class="num">Pos<span class="arrow">↕</span></th>
-            <th class="nosort"></th>
-          </tr>
-        </thead>
-        <tbody id="tbody"></tbody>
-      </table>
+          </tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="ride-list only-mob" id="rideCards"></div>
+  </section>
+
+  <!-- ======================= SETTINGS ======================= -->
+  <section class="view hidden" id="view-settings">
+    <div class="view-head"><h1>Settings</h1></div>
+    <div class="settings">
+
+      <div class="card set-card" id="accountCard">
+        <h2><svg class="i"><use href="#i-cloud"/></svg>Account</h2>
+        <div id="accountBody"></div>
+      </div>
+
+      <div class="card set-card">
+        <h2><svg class="i"><use href="#i-user"/></svg>Profile</h2>
+        <p class="sub">Used for your greeting, goal and watts per kilo. Syncs with your account.</p>
+        <form id="profileForm" class="form-grid" autocomplete="off">
+          <label class="field full"><span>Name</span><input name="name" maxlength="40" placeholder="Your first name"></label>
+          <label class="field"><span>Monthly goal <em>(km)</em></span><input name="goal" type="number" min="1" step="10" inputmode="numeric"></label>
+          <label class="field"><span>Weight <em>(kg)</em></span><input name="weight" type="number" min="30" max="200" step="0.1" inputmode="decimal"></label>
+          <label class="field"><span>FTP <em>(W, optional)</em></span><input name="ftp" type="number" min="50" max="600" step="1" inputmode="numeric"></label>
+          <label class="field"><span>Max heart rate <em>(bpm, optional)</em></span><input name="maxHr" type="number" min="120" max="230" step="1" inputmode="numeric"></label>
+        </form>
+        <div class="sub" id="profileSaved" style="margin-top:10px">Changes save automatically.</div>
+      </div>
+
+      <div class="card set-card">
+        <h2><svg class="i"><use href="#i-sun"/></svg>Appearance</h2>
+        <p class="sub">Choose light or dark, or follow your phone's setting.</p>
+        <div class="theme-pick" id="themePick">
+          <button class="theme-opt" data-theme-opt="system"><span class="swatch s"><i></i><b></b></span>System</button>
+          <button class="theme-opt" data-theme-opt="light"><span class="swatch l"><i></i><b></b></span>Light</button>
+          <button class="theme-opt" data-theme-opt="dark"><span class="swatch d"><i></i><b></b></span>Dark</button>
+        </div>
+      </div>
+
+      <div class="card set-card">
+        <h2><svg class="i"><use href="#i-db"/></svg>Your data</h2>
+        <div class="set-row"><div><div class="t">Import rides</div><div class="d">Add rides from a CSV file</div></div><button id="btnImport">Import CSV</button></div>
+        <div class="set-row"><div><div class="t">Export rides</div><div class="d">Download all rides as a CSV backup</div></div><button id="btnExport">Export CSV</button></div>
+        <div class="set-row"><div><div class="t">Delete all rides</div><div class="d" id="deleteAllHint">Removes every ride from this device</div></div><button class="danger" id="btnDeleteAll">Delete all</button></div>
+        <input type="file" id="fileInput" accept=".csv,text/csv" class="hidden">
+      </div>
+
+      <div class="card set-card">
+        <h2><svg class="i"><use href="#i-phone"/></svg>App</h2>
+        <div class="set-row"><div><div class="t">Install Ride Log</div><div class="d" id="installHint">Add it to your home screen to use it like an app, even offline.</div></div><button id="btnInstall">Install</button></div>
+        <div class="set-row"><div><div class="t">Version</div><div class="d" id="versionText"></div></div></div>
+      </div>
     </div>
   </section>
-</div>
+</main>
 
-<!-- add / edit form -->
+<!-- add / edit ride -->
 <dialog id="dlg">
   <form id="rideForm" novalidate>
     <h2 id="formTitle">Add ride</h2>
     <div class="form-grid">
       <label class="field"><span>Date</span><input type="date" name="date" required></label>
       <label class="field"><span>Type</span>
-        <select name="type">
-          <option value="training">Training ride</option>
-          <option value="race">Race</option>
-          <option value="group">Group ride</option>
-        </select>
+        <select name="type"><option value="training">Training ride</option><option value="race">Race</option><option value="group">Group ride</option></select>
       </label>
       <label class="field full"><span>Name</span><input name="name" required maxlength="80" placeholder="e.g. Sunday hill loop"></label>
-      <label class="field"><span>Distance <em>(km)</em></span><input type="number" name="distance" min="0.01" step="any" required></label>
-      <label class="field"><span>Moving time <em>(h:mm:ss)</em></span><input name="time" required placeholder="1:45:00" pattern="^\d{1,3}(:\d{1,2}){0,2}$"></label>
-      <label class="field"><span>Avg power <em>(W, optional)</em></span><input type="number" name="power" min="0" max="2000" step="1"></label>
-      <label class="field"><span>Avg heart rate <em>(bpm, optional)</em></span><input type="number" name="hr" min="30" max="230" step="1"></label>
-      <label class="field"><span>Elevation gain <em>(m)</em></span><input type="number" name="elevation" min="0" step="1" value="0"></label>
-      <label class="field" id="posField"><span>Finishing position</span><input type="number" name="position" min="1" step="1"></label>
+      <label class="field"><span>Distance <em>(km)</em></span><input type="number" name="distance" min="0.01" step="any" inputmode="decimal" required></label>
+      <label class="field"><span>Moving time <em>(h:mm:ss)</em></span><input name="time" required placeholder="1:45:00" inputmode="numeric" pattern="^\d{1,3}(:\d{1,2}){0,2}$"></label>
+      <label class="field"><span>Avg power <em>(W, optional)</em></span><input type="number" name="power" min="0" max="2000" step="1" inputmode="numeric"></label>
+      <label class="field"><span>Avg heart rate <em>(bpm, optional)</em></span><input type="number" name="hr" min="30" max="230" step="1" inputmode="numeric"></label>
+      <label class="field"><span>Elevation gain <em>(m)</em></span><input type="number" name="elevation" min="0" step="1" value="0" inputmode="numeric"></label>
+      <label class="field" id="posField"><span>Finishing position</span><input type="number" name="position" min="1" step="1" inputmode="numeric"></label>
       <label class="field full"><span>Notes</span><textarea name="notes" maxlength="500" placeholder="How did it feel? Weather, tactics, kit…"></textarea></label>
       <input type="hidden" name="best10k">
     </div>
     <div class="err" id="formErr"></div>
     <div class="form-actions">
+      <button type="button" class="danger hidden" id="btnDelete">Delete</button>
+      <span class="spacer"></span>
       <button type="button" class="ghost" id="btnCancel">Cancel</button>
       <button type="submit" class="primary">Save</button>
     </div>
@@ -425,16 +640,16 @@ button.go:hover { background: var(--good); filter: brightness(1.08); }
   <div class="live-actions" id="liveActions"></div>
 </section>
 
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
 'use strict';
+const APP_VERSION = '3.0';
 /* =================================================================
    1. DATA MODEL
    -----------------------------------------------------------------
-   One Ride record. Kept deliberately flat and unit-explicit so the
-   same shape can later be produced by a live bike computer
-   (GPS / power meter / HR strap) and dropped straight into the store.
+   One Ride record. Flat and unit-explicit so the phone's live recorder,
+   CSV files and the cloud all produce/consume the same shape.
 
    {
      id:        string   unique id
@@ -449,15 +664,20 @@ button.go:hover { background: var(--good); filter: brightness(1.08); }
      position:  number|null  finishing place (races only)
      notes:     string
      best10k:   number|null  fastest 10 km split in seconds (GPS-recorded rides)
+     updatedAt: number   ms timestamp of the last edit (used for sync)
    }
    ================================================================= */
 const STORAGE_KEY = 'ridelog.v1';
+const META_KEY    = 'ridelog.sync.v1';
 const PREFS_KEY   = 'ridelog.prefs.v1';
+const PROFILE_KEY = 'ridelog.profile.v1';
 const TYPES = { training: 'Training ride', race: 'Race', group: 'Group ride' };
 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const readJSON = k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
+const writeJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } };
 
-/** Normalise any loose object (form, CSV, future device) into a valid Ride or throw. */
+/** Normalise any loose object (form, CSV, GPS recorder, cloud) into a valid Ride or throw. */
 function makeRide(raw) {
   const num = v => (v === '' || v == null || isNaN(+v)) ? null : +v;
   const r = {
@@ -473,6 +693,7 @@ function makeRide(raw) {
     position: num(raw.position),
     notes: String(raw.notes || '').trim(),
     best10k: typeof raw.best10k === 'number' ? raw.best10k : (parseDuration(raw.best10k) || null),
+    updatedAt: num(raw.updatedAt) || 0,
   };
   if (!/^\d{4}-\d{2}-\d{2}$/.test(r.date) || isNaN(new Date(r.date))) throw new Error('Invalid date');
   if (!r.name) throw new Error('Name is required');
@@ -483,85 +704,12 @@ function makeRide(raw) {
   return r;
 }
 
-/* Derived metrics - pure functions, reusable by a live computer */
+/* Derived metrics: pure functions, reusable by the live recorder */
 const Metrics = {
   speed: r => r.distance / (r.time / 3600),                // km/h
   // Real split from a GPS-recorded ride, otherwise estimated from average speed
   est10k: r => r.best10k || (r.distance >= 10 ? 10 / Metrics.speed(r) * 3600 : null),
 };
-
-/* ---------- storage ---------- */
-const Store = {
-  rides: [],
-  load() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const all = JSON.parse(raw).map(makeRide);
-        this.rides = all.filter(r => !isSample(r));
-        if (this.rides.length !== all.length) this.save();
-      }
-    } catch (e) { console.warn('Could not read saved rides', e); }
-  },
-  save() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(this.rides)); } catch (e) { toast('Could not save (storage full or blocked)'); } },
-  upsert(r) {
-    const i = this.rides.findIndex(x => x.id === r.id);
-    i >= 0 ? this.rides[i] = r : this.rides.push(r);
-    this.save(); Cloud.put([r]);
-  },
-  remove(id) { this.rides = this.rides.filter(r => r.id !== id); this.save(); Cloud.del(id); },
-};
-
-/* ---------- optional account sync (claude.ai viewer) ----------
-   When opened as a published claude.ai page, rides are also stored in the
-   viewer's private per-user database so phone and laptop stay in sync.
-   Opened as a local file, the app simply uses localStorage. */
-const Cloud = {
-  col: null, ready: false,
-  setLabel(t) { const el = document.getElementById('syncLabel'); if (el) el.textContent = t; },
-  async init() {
-    if (!window.claude?.use) return;
-    const [db, user] = await Promise.all([claude.use('db'), claude.use('user')]);
-    const uid = user ? await user.id() : null;
-    if (!db || !uid) return;
-    const logDoc = db.doc('data/users/' + uid + '/log');
-    this.col = logDoc.collection('rides');
-    this.setLabel('Syncing…');
-    const timer = setTimeout(() => this.setLabel('Can’t reach sync yet · saved on this device'), 10000);
-    try {
-      // first visit with sync: upload the rides already on this device
-      const meta = await logDoc.get();
-      if (!meta.exists) {
-        for (const r of Store.rides) await this.col.doc(r.id).set({ ...r });
-        await logDoc.set({ seeded: true, version: 1 });
-      }
-    } catch (e) { clearTimeout(timer); this.col = null; this.setLabel('Saved on this device'); return; }
-    this.col.onSnapshot(snap => {
-      if (!snap.metadata.fromCache) { clearTimeout(timer); this.setLabel('Synced to your account'); }
-      const rides = [];
-      snap.docs.forEach(d => { try { rides.push(makeRide(d.data())); } catch {} });
-      rides.filter(isSample).forEach(r => this.del(r.id));        // clear old example rides from the account
-      Store.rides = rides.filter(r => !isSample(r)); Store.save();
-      this.ready = true;
-      render();
-    }, () => { clearTimeout(timer); this.col = null; this.setLabel('Sync stopped · saved on this device'); });
-  },
-  async put(list) {
-    if (!this.col) return;
-    for (const r of list) {
-      try { await this.col.doc(r.id).set({ ...r }); }
-      catch (e) { toast(e?.code === 'quota_exceeded' ? 'Sync storage is full' : 'Could not sync, saved on this device'); return; }
-    }
-  },
-  async del(id) {
-    if (!this.col) return;
-    try { await this.col.doc(id).delete(); } catch { toast('Could not sync delete'); }
-  },
-};
-
-const Prefs = Object.assign({ range: 'season', metric: 'speed', period: 'week', goal: 500, theme: null, sortKey: 'date', sortDir: -1 },
-  (() => { try { return JSON.parse(localStorage.getItem(PREFS_KEY)) || {}; } catch { return {}; } })());
-const savePrefs = () => { try { localStorage.setItem(PREFS_KEY, JSON.stringify(Prefs)); } catch {} };
 
 /* ---------- legacy sample cleanup ----------
    Early versions pre-loaded 15 example rides. They are recognised by their exact
@@ -578,6 +726,70 @@ const SAMPLE_SIGNATURES = new Set([
   'Coffee & tempo|41.2|350|',
 ]);
 const isSample = r => SAMPLE_SIGNATURES.has(`${r.name}|${r.distance}|${r.elevation}|${r.notes}`);
+
+/* ---------- local store (always the source the UI reads) ----------
+   meta tracks what still has to reach the cloud:
+     dirty:   ids edited locally since the last sync
+     deleted: ids deleted locally since the last sync
+     lastPull: server timestamp of the newest change already pulled
+     owner:   the account id these rides belong to (null = not signed in) */
+const freshMeta = () => ({ dirty: [], deleted: [], lastPull: null, owner: null });
+const Store = {
+  rides: [], meta: freshMeta(),
+  load() {
+    const raw = readJSON(STORAGE_KEY);
+    if (Array.isArray(raw)) {
+      const all = [];
+      raw.forEach(x => { try { all.push(makeRide(x)); } catch {} });
+      this.rides = all.filter(r => !isSample(r));
+      if (this.rides.length !== raw.length) this.save();
+    }
+    this.meta = Object.assign(freshMeta(), readJSON(META_KEY) || {});
+  },
+  save() { if (!writeJSON(STORAGE_KEY, this.rides)) toast('Could not save (storage full or blocked)'); },
+  saveMeta() { writeJSON(META_KEY, this.meta); },
+  markDirty(id) { if (!this.meta.dirty.includes(id)) this.meta.dirty.push(id); this.saveMeta(); },
+  upsert(r) {
+    r.updatedAt = Date.now();
+    const i = this.rides.findIndex(x => x.id === r.id);
+    i >= 0 ? this.rides[i] = r : this.rides.push(r);
+    this.save(); this.markDirty(r.id);
+    Cloud.put([r]); Account.schedule();
+  },
+  addMany(list) {
+    const t = Date.now();
+    list.forEach(r => { r.updatedAt = t; this.rides.push(r); if (!this.meta.dirty.includes(r.id)) this.meta.dirty.push(r.id); });
+    this.save(); this.saveMeta();
+    Cloud.put(list); Account.schedule();
+  },
+  remove(id) {
+    this.rides = this.rides.filter(r => r.id !== id);
+    this.meta.dirty = this.meta.dirty.filter(x => x !== id);
+    if (!this.meta.deleted.includes(id)) this.meta.deleted.push(id);
+    this.save(); this.saveMeta();
+    Cloud.del(id); Account.schedule();
+  },
+  removeAll() { [...this.rides].forEach(r => { this.meta.deleted.push(r.id); Cloud.del(r.id); }); this.rides = []; this.meta.dirty = []; this.save(); this.saveMeta(); Account.schedule(); },
+  wipeLocal() { this.rides = []; this.meta = freshMeta(); this.save(); this.saveMeta(); },
+};
+
+/* ---------- profile (syncs with the account) ---------- */
+const PROFILE_DEFAULTS = { name: '', goal: 500, weight: null, ftp: null, maxHr: null };
+const Profile = {
+  data: { ...PROFILE_DEFAULTS }, updatedAt: 0, dirty: false,
+  load() {
+    const p = readJSON(PROFILE_KEY);
+    if (p) { this.data = { ...PROFILE_DEFAULTS, ...p.data }; this.updatedAt = p.updatedAt || 0; this.dirty = !!p.dirty; }
+    else { const old = readJSON(PREFS_KEY); if (old && old.goal) this.data.goal = old.goal; }   // migrate goal from v1/v2
+  },
+  persist() { writeJSON(PROFILE_KEY, { data: this.data, updatedAt: this.updatedAt, dirty: this.dirty }); },
+  set(changes) { Object.assign(this.data, changes); this.updatedAt = Date.now(); this.dirty = true; this.persist(); Account.schedule(); },
+  reset() { this.data = { ...PROFILE_DEFAULTS }; this.updatedAt = 0; this.dirty = false; this.persist(); },
+};
+
+/* device-only preferences */
+const Prefs = Object.assign({ range: 'season', metric: 'speed', period: 'week', theme: null, sortKey: 'date', sortDir: -1 }, readJSON(PREFS_KEY) || {});
+const savePrefs = () => writeJSON(PREFS_KEY, Prefs);
 
 /* =================================================================
    2. UTILITIES
@@ -649,19 +861,16 @@ function parseCSV(text) {
   if (cur || row.length) { row.push(cur); rows.push(row); }
   return rows.filter(r => r.some(c => c.trim() !== ''));
 }
-
 function importCSV(text) {
   const rows = parseCSV(text);
   if (rows.length < 2) throw new Error('CSV has no data rows');
   const head = rows[0].map(h => h.trim().toLowerCase());
-  // accept a few common header aliases
   const alias = { distance: 'distance_km', time: 'moving_time', power: 'avg_power_w', hr: 'avg_hr_bpm', heart_rate: 'avg_hr_bpm', elevation: 'elevation_m' };
   const idx = {}; head.forEach((h, i) => idx[alias[h] || h] = i);
   if (idx.date == null || idx.distance_km == null) throw new Error('CSV needs at least "date" and "distance_km" columns');
   const get = (r, k) => idx[k] != null ? (r[idx[k]] ?? '').trim() : '';
   const typeMap = v => { v = v.toLowerCase(); return v.startsWith('race') ? 'race' : v.startsWith('group') ? 'group' : 'training'; };
-
-  let added = 0, skipped = 0; const fresh = [];
+  let skipped = 0; const fresh = [];
   const existing = new Set(Store.rides.map(r => `${r.date}|${r.name}|${r.distance}`));
   rows.slice(1).forEach(r => {
     try {
@@ -672,11 +881,11 @@ function importCSV(text) {
       });
       const key = `${ride.date}|${ride.name}|${ride.distance}`;
       if (existing.has(key)) { skipped++; return; }
-      existing.add(key); Store.rides.push(ride); fresh.push(ride); added++;
+      existing.add(key); fresh.push(ride);
     } catch { skipped++; }
   });
-  Store.save(); Cloud.put(fresh);
-  return { added, skipped };
+  if (fresh.length) Store.addMany(fresh);
+  return { added: fresh.length, skipped };
 }
 
 async function download(name, text) {
@@ -691,11 +900,216 @@ async function download(name, text) {
   a.href = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }));
   a.download = name; document.body.appendChild(a); a.click();
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 0);
-  toast('Exported ' + Store.rides.length + ' rides');
+  toast(`Exported ${Store.rides.length} rides`);
 }
 
 /* =================================================================
-   4. FORM
+   4. ACCOUNTS & CLOUD SYNC (Supabase)
+   -----------------------------------------------------------------
+   Offline-first: every change is saved on the phone immediately and
+   queued; sync() pushes the queue and pulls changes from other devices.
+   Conflicts: the most recent edit wins (per ride).
+   Turned on by filling in config.js (see supabase/README.md).
+   ================================================================= */
+const CFG = window.RIDELOG_CONFIG || {};
+const APP_URL = location.origin + location.pathname;
+function loadScript(src) {
+  return new Promise((ok, fail) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => fail(new Error('Could not load ' + src)); document.head.appendChild(s); });
+}
+
+const Account = {
+  configured: !!(CFG.supabaseUrl && CFG.supabaseKey) && window.top === window,
+  sb: null, user: null, ready: false, syncing: false, again: false, timer: null,
+  status: 'idle', lastSync: 0, error: '', recovery: false,
+
+  async init() {
+    if (!this.configured) { this.ready = true; renderAccount(); return; }
+    try {
+      if (!window.supabase) await loadScript('vendor/supabase.js');
+      this.sb = window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseKey, {
+        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storageKey: 'ridelog.auth' },
+      });
+      const { data } = await this.sb.auth.getSession();
+      this.adopt(data.session?.user || null);
+      this.sb.auth.onAuthStateChange((evt, session) => {
+        if (evt === 'PASSWORD_RECOVERY') { this.recovery = true; location.hash = '#settings'; }
+        // never await Supabase calls inside this callback; defer them
+        setTimeout(() => { this.adopt(session?.user || null); renderAccount(); }, 0);
+      });
+    } catch (e) { this.error = e.message; this.sb = null; }
+    this.ready = true; renderAccount();
+    addEventListener('online', () => this.sync());
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') this.sync(); });
+  },
+
+  /** Called whenever the signed-in user is known or changes. */
+  adopt(user) {
+    const prev = this.user?.id;
+    this.user = user;
+    if (!user || prev === user.id) { renderAccount(); if (user) this.sync(); return; }
+    const m = Store.meta;
+    if (m.owner && m.owner !== user.id) {
+      Store.wipeLocal(); Profile.reset();            // leftovers from a different account
+    } else if (!m.owner) {
+      // first sign-in on this device: rides already here join the account
+      m.dirty = Store.rides.map(r => r.id); m.lastPull = null;
+      if (Profile.updatedAt) Profile.dirty = true;
+      if (Store.rides.length) toast(`Adding ${Store.rides.length} ride${Store.rides.length === 1 ? '' : 's'} from this phone to your account`);
+    }
+    Store.meta.owner = user.id; Store.saveMeta();
+    renderAccount(); this.sync();
+  },
+
+  schedule(ms = 1500) { if (!this.user) return; clearTimeout(this.timer); this.timer = setTimeout(() => this.sync(), ms); },
+
+  async sync() {
+    if (!this.sb || !this.user) return;
+    if (this.syncing) { this.again = true; return; }
+    if (!navigator.onLine) { this.setStatus('offline'); return; }
+    this.syncing = true; this.setStatus('syncing');
+    const uidv = this.user.id, m = Store.meta;
+    try {
+      // 1. push deletions
+      const delIds = m.deleted.slice();
+      if (delIds.length) {
+        const now = new Date().toISOString();
+        const { error } = await this.sb.from('rides').upsert(delIds.map(id => ({ id, user_id: uidv, data: null, deleted: true, updated_at: now })));
+        if (error) throw error;
+        m.deleted = m.deleted.filter(id => !delIds.includes(id)); Store.saveMeta();
+      }
+      // 2. push edits (remember which version we sent, in case it changes meanwhile)
+      const sent = new Map(Store.rides.filter(r => m.dirty.includes(r.id)).map(r => [r.id, r.updatedAt]));
+      if (sent.size) {
+        const rows = Store.rides.filter(r => sent.has(r.id)).map(r => ({ id: r.id, user_id: uidv, data: r, deleted: false, updated_at: new Date(r.updatedAt || Date.now()).toISOString() }));
+        for (let i = 0; i < rows.length; i += 200) {
+          const { error } = await this.sb.from('rides').upsert(rows.slice(i, i + 200));
+          if (error) throw error;
+        }
+        m.dirty = m.dirty.filter(id => { const r = Store.rides.find(x => x.id === id); return r && r.updatedAt !== sent.get(id); });
+        Store.saveMeta();
+      }
+      // 3. pull changes from other devices (server-stamped synced_at, with a 1-min overlap)
+      let since = m.lastPull ? new Date(Date.parse(m.lastPull) - 60000).toISOString() : null, changed = false, newest = m.lastPull;
+      for (let page = 0; page < 50; page++) {
+        let q = this.sb.from('rides').select('id,data,deleted,updated_at,synced_at').order('synced_at', { ascending: true }).limit(1000);
+        if (since) q = q.gt('synced_at', since);
+        const { data, error } = await q;
+        if (error) throw error;
+        for (const row of data) {
+          if (!newest || Date.parse(row.synced_at) > Date.parse(newest)) newest = row.synced_at;
+          const i = Store.rides.findIndex(r => r.id === row.id), local = Store.rides[i];
+          const remoteT = Date.parse(row.updated_at) || 0;
+          if (row.deleted) {
+            if (local && !(m.dirty.includes(row.id) && local.updatedAt > remoteT)) { Store.rides.splice(i, 1); changed = true; }
+            continue;
+          }
+          if (m.deleted.includes(row.id) || (local && local.updatedAt >= remoteT)) continue;
+          try { const r = makeRide({ ...row.data, updatedAt: remoteT }); i >= 0 ? Store.rides[i] = r : Store.rides.push(r); changed = true; } catch {}
+        }
+        if (data.length < 1000) break;
+        since = newest;
+      }
+      m.lastPull = newest; Store.saveMeta();
+      if (changed) { Store.save(); render(); }
+      // 4. profile
+      await this.syncProfile();
+      this.lastSync = Date.now(); this.error = ''; this.setStatus('ok');
+    } catch (e) {
+      this.error = e?.message || String(e); this.setStatus('error');
+      console.warn('Sync failed', e);
+    } finally {
+      this.syncing = false;
+      if (this.again) { this.again = false; this.schedule(500); }
+    }
+  },
+
+  async syncProfile() {
+    const { data, error } = await this.sb.from('profiles').select('data,updated_at').eq('user_id', this.user.id).maybeSingle();
+    if (error) throw error;
+    const remoteT = data ? Date.parse(data.updated_at) : 0;
+    if (Profile.dirty && Profile.updatedAt >= remoteT) {
+      const { error: e2 } = await this.sb.from('profiles').upsert({ user_id: this.user.id, data: Profile.data, updated_at: new Date(Profile.updatedAt || Date.now()).toISOString() });
+      if (e2) throw e2;
+      Profile.dirty = false; Profile.persist();
+    } else if (data && remoteT > Profile.updatedAt) {
+      Profile.data = { ...PROFILE_DEFAULTS, ...data.data }; Profile.updatedAt = remoteT; Profile.dirty = false; Profile.persist();
+      fillProfileForm(); render();
+    } else if (Profile.dirty) { Profile.dirty = false; Profile.persist(); }
+  },
+
+  pending() { return Store.meta.dirty.length + Store.meta.deleted.length + (Profile.dirty ? 1 : 0); },
+
+  setStatus(s) { this.status = s; renderSyncChip(); if (currentView === 'settings') renderAccountStatus(); },
+
+  async signUp(email, password) {
+    const { data, error } = await this.sb.auth.signUp({ email, password, options: { emailRedirectTo: APP_URL } });
+    if (error) throw error;
+    return !!data.session;   // false = needs email confirmation
+  },
+  async signIn(email, password) { const { error } = await this.sb.auth.signInWithPassword({ email, password }); if (error) throw error; },
+  async resetPassword(email) { const { error } = await this.sb.auth.resetPasswordForEmail(email, { redirectTo: APP_URL }); if (error) throw error; },
+  async updatePassword(password) { const { error } = await this.sb.auth.updateUser({ password }); if (error) throw error; this.recovery = false; },
+  async signOut() {
+    await this.sync();
+    const p = this.pending();
+    if (p && !confirm(`${p} change${p === 1 ? '' : 's'} haven't reached your account yet (you may be offline) and will be lost from this phone. Sign out anyway?`)) return;
+    try { await this.sb.auth.signOut({ scope: 'local' }); } catch {}
+    this.user = null;
+    Store.wipeLocal(); Profile.reset();
+    this.setStatus('idle'); render(); renderAccount(); fillProfileForm();
+    toast('Signed out. Your rides are safe in your account.');
+  },
+};
+
+/* ---------- claude.ai viewer sync (only when opened inside claude.ai) ----------
+   When opened as a published claude.ai page, rides are also stored in the
+   viewer's private per-user database so phone and laptop stay in sync.
+   Opened as a local file, the app simply uses localStorage. */
+const Cloud = {
+  col: null, ready: false,
+  setLabel(t) { const el = document.getElementById('syncLabel'); if (el) el.textContent = t; },
+  async init() {
+    if (!window.claude?.use) return;
+    const [db, user] = await Promise.all([claude.use('db'), claude.use('user')]);
+    const uid = user ? await user.id() : null;
+    if (!db || !uid) return;
+    const logDoc = db.doc('data/users/' + uid + '/log');
+    this.col = logDoc.collection('rides');
+    this.setLabel('Syncing…');
+    const timer = setTimeout(() => this.setLabel('Can’t reach sync yet · saved on this device'), 10000);
+    try {
+      // first visit with sync: upload the rides already on this device
+      const meta = await logDoc.get();
+      if (!meta.exists) {
+        for (const r of Store.rides) await this.col.doc(r.id).set({ ...r });
+        await logDoc.set({ seeded: true, version: 1 });
+      }
+    } catch (e) { clearTimeout(timer); this.col = null; this.setLabel('Saved on this device'); return; }
+    this.col.onSnapshot(snap => {
+      if (!snap.metadata.fromCache) { clearTimeout(timer); this.setLabel('Synced to your account'); }
+      const rides = [];
+      snap.docs.forEach(d => { try { rides.push(makeRide(d.data())); } catch {} });
+      rides.filter(isSample).forEach(r => this.del(r.id));        // clear old example rides from the account
+      Store.rides = rides.filter(r => !isSample(r)); Store.save();
+      this.ready = true;
+      render();
+    }, () => { clearTimeout(timer); this.col = null; this.setLabel('Sync stopped · saved on this device'); });
+  },
+  async put(list) {
+    if (!this.col) return;
+    for (const r of list) {
+      try { await this.col.doc(r.id).set({ ...r }); }
+      catch (e) { toast(e?.code === 'quota_exceeded' ? 'Sync storage is full' : 'Could not sync, saved on this device'); return; }
+    }
+  },
+  async del(id) {
+    if (!this.col) return;
+    try { await this.col.doc(id).delete(); } catch { toast('Could not sync delete'); }
+  },
+};
+
+/* =================================================================
+   5. RIDE FORM
    ================================================================= */
 const dlg = $('#dlg'), form = $('#rideForm');
 let editingId = null;
@@ -705,6 +1119,7 @@ function openForm(ride) {
   form.reset();
   $('#formTitle').textContent = ride ? 'Edit ride' : 'Add ride';
   $('#formErr').textContent = '';
+  $('#btnDelete').classList.toggle('hidden', !ride);
   $$('.field').forEach(f => f.classList.remove('invalid'));
   const f = form.elements;
   if (ride) {
@@ -717,13 +1132,17 @@ function openForm(ride) {
   }
   togglePos();
   dlg.showModal();
-  f.name.focus();
+  if (matchMedia('(min-width: 761px)').matches) f.name.focus();
 }
 function togglePos() { $('#posField').classList.toggle('hidden', form.elements.type.value !== 'race'); }
 
 form.elements.type.addEventListener('change', togglePos);
 $('#btnCancel').onclick = () => dlg.close();
 dlg.addEventListener('close', () => { if (Live.saving) { Live.saving = false; Live.open(); } });
+$('#btnDelete').onclick = () => {
+  const r = Store.rides.find(x => x.id === editingId);
+  if (r && confirm(`Delete "${r.name}" (${fmtDate(r.date)})?`)) { Store.remove(r.id); dlg.close(); toast('Ride deleted'); render(); }
+};
 form.addEventListener('submit', e => {
   e.preventDefault();
   const f = form.elements;
@@ -745,13 +1164,13 @@ form.addEventListener('submit', e => {
     Store.upsert(ride);
     if (Live.saving) Live.clear();
     dlg.close();
-    toast(editingId ? 'Ride updated' : 'Ride added');
+    toast(editingId ? 'Ride updated' : 'Ride saved');
     render();
   } catch (err) { $('#formErr').textContent = err.message; }
 });
 
 /* =================================================================
-   5. FILTERING
+   6. FILTERING
    ================================================================= */
 function rangeBounds() {
   const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -765,29 +1184,64 @@ function ridesInRange() {
 }
 
 /* =================================================================
-   6. SUMMARY TILES
+   7. HOME: hero + goal ring, tiles, charts, PBs, recent
    ================================================================= */
+const icon = id => `<svg class="i"><use href="#i-${id}"/></svg>`;
+
+function renderHero() {
+  const now = new Date(), h = now.getHours();
+  const hello = h < 5 ? 'Good night' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+  const name = Profile.data.name.trim();
+  $('#heroDate').textContent = now.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
+  $('#heroTitle').textContent = name ? `${hello}, ${name}` : hello;
+
+  const monthKey = isoDate(now).slice(0, 7);
+  const monthRides = Store.rides.filter(r => r.date.startsWith(monthKey));
+  const km = monthRides.reduce((a, r) => a + r.distance, 0);
+  const goal = Math.max(1, +Profile.data.goal || 500);
+  const pct = Math.min(1, km / goal);
+  const daysIn = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const daysLeft = daysIn - now.getDate();
+  const left = Math.max(0, goal - km);
+  const C = 2 * Math.PI * 52;
+  requestAnimationFrame(() => $('#ringProg').style.strokeDashoffset = String(C * (1 - pct)));
+  $('#ringKm').textContent = fmtKm(km, 0);
+  $('#ringOf').textContent = `of ${goal} km`;
+  $('#goalRing').setAttribute('aria-label', `Monthly goal: ${Math.round(km)} of ${goal} km`);
+  const monthName = now.toLocaleDateString(undefined, { month: 'long' });
+  let text;
+  if (!Store.rides.length) text = 'Record your first ride with your phone, or add one you’ve already done.';
+  else if (left <= 0) text = `Goal smashed: ${fmtKm(km, 0)} km in ${monthName}. 🎉`;
+  else if (!monthRides.length) text = `No rides yet in ${monthName}. ${goal} km to go. Time to get out there!`;
+  else {
+    const expected = goal * now.getDate() / daysIn;
+    text = `${monthRides.length} ride${monthRides.length === 1 ? '' : 's'} this month. ${fmtKm(left, 0)} km to go` +
+      (daysLeft > 0 ? `, about ${fmtKm(left / daysLeft, 0)} km a day. You're ${km >= expected ? 'ahead of' : 'behind'} pace.` : ', last day of the month!');
+  }
+  $('#heroText').textContent = text;
+}
+
 function renderTiles(rides) {
   const totalKm = rides.reduce((a, r) => a + r.distance, 0);
   const totalT = rides.reduce((a, r) => a + r.time, 0);
+  const climb = rides.reduce((a, r) => a + r.elevation, 0);
   const races = rides.filter(r => r.type === 'race');
   const placed = races.filter(r => r.position != null).sort((a, b) => a.position - b.position || b.date.localeCompare(a.date));
   const best = placed[0];
   const longest = rides.slice().sort((a, b) => b.distance - a.distance)[0];
-  const tile = (label, value, unit, hint) =>
-    `<div class="card tile"><div class="label">${label}</div><div class="value">${value}${unit ? `<small>${unit}</small>` : ''}</div><div class="hint">${hint}</div></div>`;
+  const podiums = placed.filter(r => r.position <= 3).length;
+  const tile = (ic, label, value, unit, hint) =>
+    `<div class="card tile"><div class="label">${icon(ic)}${label}</div><div class="value">${value}${unit ? `<small>${unit}</small>` : ''}</div><div class="hint">${hint}</div></div>`;
   $('#tiles').innerHTML = [
-    tile('Total distance', fmtKm(totalKm, 0), 'km', `${rides.length} ride${rides.length === 1 ? '' : 's'}`),
-    tile('Ride time', fmtDuration(totalT, false), '', rides.length ? `${fmtKm(totalKm / (totalT / 3600))} km/h average` : '—'),
-    tile('Races', races.length, '', races.length ? `${placed.filter(r => r.position <= 3).length} podium${placed.filter(r => r.position <= 3).length === 1 ? '' : 's'}` : 'No races yet'),
-    tile('Best finish', best ? ordinal(best.position) : '—', '', best ? esc(best.name) : 'No placings yet'),
-    tile('Longest ride', longest ? fmtKm(longest.distance) : '—', longest ? 'km' : '', longest ? esc(longest.name) : '—'),
+    tile('road', 'Distance', fmtKm(totalKm, 0), 'km', `${rides.length} ride${rides.length === 1 ? '' : 's'}`),
+    tile('clock', 'Ride time', fmtDuration(totalT, false), '', rides.length ? `${fmtKm(totalKm / (totalT / 3600))} km/h average` : '—'),
+    tile('mount', 'Climbing', Math.round(climb).toLocaleString(), 'm', rides.length ? `${fmtKm(climb / Math.max(totalKm, 1) , 1)} m per km` : '—'),
+    tile('flag', 'Races', races.length, '', races.length ? `${podiums} podium${podiums === 1 ? '' : 's'}` : 'No races yet'),
+    tile('trophy', 'Best finish', best ? ordinal(best.position) : '—', '', best ? esc(best.name) : 'No placings yet'),
+    tile('ruler', 'Longest ride', longest ? fmtKm(longest.distance) : '—', longest ? 'km' : '', longest ? esc(longest.name) : '—'),
   ].join('');
 }
 
-/* =================================================================
-   7. CHARTS
-   ================================================================= */
 let trendChart, volChart;
 const METRICS = {
   speed: { label: 'Average speed', unit: 'km/h', sub: 'km/h per ride', color: '--accent', get: r => Metrics.speed(r), dp: 1 },
@@ -805,47 +1259,59 @@ function baseOptions(yTitle) {
       legend: { display: false },
       tooltip: {
         backgroundColor: cssVar('--surface'), titleColor: cssVar('--text'), bodyColor: cssVar('--text-2'),
-        borderColor: cssVar('--border'), borderWidth: 1, padding: 10, cornerRadius: 8,
+        borderColor: cssVar('--border'), borderWidth: 1, padding: 10, cornerRadius: 10,
         displayColors: false, titleFont: { weight: '600' },
       },
     },
     scales: {
-      x: { grid: { display: false }, border: { color: grid }, ticks: { color: text2, maxRotation: 0, autoSkip: true, maxTicksLimit: 8 } },
-      y: { grid: { color: grid }, border: { display: false }, ticks: { color: text2, padding: 6 },
+      x: { grid: { display: false }, border: { color: grid }, ticks: { color: text2, maxRotation: 0, autoSkip: true, maxTicksLimit: 7 } },
+      y: { grid: { color: grid }, border: { display: false }, ticks: { color: text2, padding: 6, maxTicksLimit: 6 },
            title: { display: true, text: yTitle, color: text2, font: { size: 12 } } },
     },
   };
 }
 
+function chartEmpty(id, msg) { const el = $(id); el.textContent = msg || ''; el.classList.toggle('hidden', !msg); }
+
 function renderTrend(rides) {
   const m = METRICS[Prefs.metric];
   const pts = rides.filter(r => m.get(r) != null);
   $('#trendTitle').textContent = m.label;
-  $('#trendSub').textContent = pts.length ? m.sub : 'No data for this metric in the selected range';
+  $('#trendSub').textContent = m.sub;
+  if (trendChart) { trendChart.destroy(); trendChart = null; }
+  if (!pts.length) {
+    chartEmpty('#trendEmpty', rides.length ? `No ${m.label.toLowerCase()} data in this range.` : 'Your rides will show up here.');
+    return;
+  }
+  chartEmpty('#trendEmpty', '');
   const color = cssVar(m.color);
   const opts = baseOptions(m.unit);
   opts.scales.x.title = { display: true, text: 'Ride date', color: cssVar('--text-2'), font: { size: 12 } };
+  const wkg = Prefs.metric === 'power' && +Profile.data.weight > 0;
   opts.plugins.tooltip.callbacks = {
     title: items => fmtDate(pts[items[0].dataIndex].date),
     label: item => {
       const r = pts[item.dataIndex];
-      return [`${r.name}`, `${m.label}: ${item.parsed.y.toFixed(m.dp)} ${m.unit}`, `${fmtKm(r.distance)} km · ${TYPES[r.type]}`];
+      const lines = [`${r.name}`, `${m.label}: ${item.parsed.y.toFixed(m.dp)} ${m.unit}`];
+      if (wkg) lines.push(`${(r.power / Profile.data.weight).toFixed(2)} W/kg`);
+      lines.push(`${fmtKm(r.distance)} km · ${TYPES[r.type]}`);
+      return lines;
     },
   };
-  const data = {
+  const ctx = $('#trendChart').getContext('2d');
+  const grad = ctx.createLinearGradient(0, 0, 0, 280);
+  grad.addColorStop(0, color + '33'); grad.addColorStop(1, color + '00');
+  trendChart = new Chart(ctx, { type: 'line', options: opts, data: {
     labels: pts.map(r => fmtShort(r.date)),
     datasets: [{
       data: pts.map(r => +m.get(r).toFixed(m.dp)),
-      borderColor: color, backgroundColor: color + '22', fill: true, cubicInterpolationMode: 'monotone',
+      borderColor: color, backgroundColor: grad, fill: true, cubicInterpolationMode: 'monotone',
       borderWidth: 2, pointRadius: 4, pointHoverRadius: 7,
       pointBackgroundColor: color, pointBorderColor: cssVar('--surface'), pointBorderWidth: 2,
-      // race points drawn as larger rotated squares so type is visible without color
-      pointStyle: pts.map(r => r.type === 'race' ? 'rectRot' : 'circle'),
+      pointStyle: pts.map(r => r.type === 'race' ? 'rectRot' : 'circle'),   // races drawn as diamonds
       pointHitRadius: 12,
     }],
-  };
-  if (trendChart) trendChart.destroy();
-  trendChart = new Chart($('#trendChart'), { type: 'line', data, options: opts });
+  } });
 }
 
 function weekStart(d) { const x = new Date(d); const dow = (x.getDay() + 6) % 7; x.setDate(x.getDate() - dow); x.setHours(0, 0, 0, 0); return x; }
@@ -853,21 +1319,22 @@ function weekStart(d) { const x = new Date(d); const dow = (x.getDay() + 6) % 7;
 function renderVolume(rides) {
   const byWeek = Prefs.period === 'week';
   $('#volSub').textContent = byWeek ? 'km per week (Mon–Sun)' : 'km per month';
+  if (volChart) { volChart.destroy(); volChart = null; }
+  if (!rides.length) { chartEmpty('#volEmpty', Store.rides.length ? 'No rides in this range.' : 'Weekly and monthly distance will show up here.'); return; }
+  chartEmpty('#volEmpty', '');
   const buckets = new Map();
   const [rs, re] = rangeBounds();
-  // build continuous buckets so empty weeks/months show as gaps, not missing
-  if (rides.length) {
-    let cur = byWeek ? weekStart(rs || parseISO(rides[0].date)) : new Date((rs || parseISO(rides[0].date)).getFullYear(), (rs || parseISO(rides[0].date)).getMonth(), 1);
-    const end = re || new Date();
-    while (cur <= end) {
-      buckets.set(isoDate(cur), { km: 0, n: 0, start: new Date(cur) });
-      byWeek ? cur.setDate(cur.getDate() + 7) : cur.setMonth(cur.getMonth() + 1);
-    }
+  const first = rs || parseISO(rides[0].date);
+  let cur = byWeek ? weekStart(first) : new Date(first.getFullYear(), first.getMonth(), 1);
+  const end = re || new Date();
+  while (cur <= end) {   // continuous buckets so empty weeks show as gaps
+    buckets.set(isoDate(cur), { km: 0, n: 0, start: new Date(cur) });
+    byWeek ? cur.setDate(cur.getDate() + 7) : cur.setMonth(cur.getMonth() + 1);
   }
   rides.forEach(r => {
     const d = parseISO(r.date);
-    const k = isoDate(byWeek ? weekStart(d) : new Date(d.getFullYear(), d.getMonth(), 1));
-    if (!buckets.has(k)) buckets.set(k, { km: 0, n: 0, start: byWeek ? weekStart(d) : new Date(d.getFullYear(), d.getMonth(), 1) });
+    const s = byWeek ? weekStart(d) : new Date(d.getFullYear(), d.getMonth(), 1), k = isoDate(s);
+    if (!buckets.has(k)) buckets.set(k, { km: 0, n: 0, start: s });
     const b = buckets.get(k); b.km += r.distance; b.n++;
   });
   const arr = [...buckets.values()].sort((a, b) => a.start - b.start);
@@ -886,66 +1353,63 @@ function renderVolume(rides) {
     label: item => { const b = arr[item.dataIndex]; return [`${fmtKm(b.km)} km`, `${b.n} ride${b.n === 1 ? '' : 's'}`]; },
   };
   const color = cssVar('--accent');
-  const data = {
+  volChart = new Chart($('#volChart'), { type: 'bar', options: opts, data: {
     labels: arr.map(label),
     datasets: [{
       data: arr.map(b => +b.km.toFixed(1)),
       backgroundColor: color, hoverBackgroundColor: color,
       borderRadius: { topLeft: 4, topRight: 4 }, borderSkipped: 'bottom',
-      maxBarThickness: 36, categoryPercentage: .85, barPercentage: .9,
+      maxBarThickness: 34, categoryPercentage: .85, barPercentage: .9,
     }],
-  };
-  if (volChart) volChart.destroy();
-  volChart = new Chart($('#volChart'), { type: 'bar', data, options: opts });
+  } });
 }
 
-/* =================================================================
-   8. GOAL TRACKER (always current calendar month)
-   ================================================================= */
-function renderGoal() {
-  const now = new Date();
-  const monthKey = isoDate(now).slice(0, 7);
-  const km = Store.rides.filter(r => r.date.startsWith(monthKey)).reduce((a, r) => a + r.distance, 0);
-  const goal = Math.max(1, +Prefs.goal || 500);
-  const pct = Math.min(100, km / goal * 100);
-  const daysIn = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-  const daysLeft = daysIn - now.getDate();
-  const left = Math.max(0, goal - km);
-  $('#goalInput').value = goal;
-  $('#goalMonth').textContent = now.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
-  $('#goalDone').innerHTML = `${fmtKm(km, 0)} <span class="sub" style="font-size:1rem">/ ${goal} km</span>`;
-  $('#goalLeft').textContent = left > 0 ? `${fmtKm(left, 0)} km to go · ${Math.round(pct)}%` : 'Goal reached 🎉';
-  const bar = $('#goalBar'); bar.classList.toggle('done', pct >= 100);
-  bar.setAttribute('aria-valuenow', Math.round(pct));
-  requestAnimationFrame(() => bar.firstElementChild.style.width = pct + '%');
-  const expected = goal * now.getDate() / daysIn;
-  $('#goalPace').textContent = left <= 0 ? `Finished with ${daysLeft} day${daysLeft === 1 ? '' : 's'} to spare.`
-    : daysLeft > 0 ? `Need ${fmtKm(left / daysLeft, 0)} km/day for the remaining ${daysLeft} days · ${km >= expected ? 'ahead of' : 'behind'} pace (${fmtKm(expected, 0)} km expected by today).`
-    : 'Last day of the month — one more ride?';
-}
-
-/* =================================================================
-   9. PERSONAL BESTS (always all-time)
-   ================================================================= */
 function renderPBs() {
   const R = Store.rides;
   const maxBy = (arr, f) => arr.reduce((b, r) => (f(r) != null && (b == null || f(r) > f(b))) ? r : b, null);
   const fast = R.filter(r => Metrics.est10k(r) != null).reduce((b, r) => !b || Metrics.est10k(r) < Metrics.est10k(b) ? r : b, null);
   const longest = maxBy(R, r => r.distance);
-  const climb = maxBy(R, r => r.elevation);
+  const climb = maxBy(R, r => r.elevation || null);
   const finish = R.filter(r => r.position != null).sort((a, b) => a.position - b.position || b.date.localeCompare(a.date))[0];
-  const pb = (icon, label, value, r, extra = '') => `<div class="pb"><div class="label">${icon} ${label}</div>
-    <div class="value">${value}</div><div class="meta">${r ? `${esc(r.name)} · ${fmtDate(r.date)}${extra}` : 'No data yet'}</div></div>`;
+  const pb = (ic, label, value, r, extra = '') => `<div class="card pb"><div class="label"><span class="ic">${icon(ic)}</span>${label}</div>
+    <div class="value">${value}</div><div class="meta">${r ? `${esc(r.name)} · ${fmtShort(r.date)}${extra}` : 'No data yet'}</div></div>`;
   $('#pbs').innerHTML = [
-    pb('⚡', 'Fastest 10 km', fast ? fmtDuration(Metrics.est10k(fast)).replace(/^0:/, '') : '—', fast, fast ? (fast.best10k ? ' · GPS split' : ` · est. from ${fmtKm(Metrics.speed(fast))} km/h avg`) : ''),
-    pb('🛣️', 'Longest ride', longest ? `${fmtKm(longest.distance)} km` : '—', longest),
-    pb('⛰️', 'Most climbing', climb ? `${climb.elevation.toLocaleString()} m` : '—', climb),
-    pb('🏆', 'Best finish', finish ? ordinal(finish.position) : '—', finish),
+    pb('bolt', 'Fastest 10 km', fast ? fmtDuration(Metrics.est10k(fast)).replace(/^0:/, '') : '—', fast, fast ? (fast.best10k ? ' · GPS split' : ' · estimated') : ''),
+    pb('ruler', 'Longest ride', longest ? `${fmtKm(longest.distance)} km` : '—', longest),
+    pb('mount', 'Most climbing', climb ? `${climb.elevation.toLocaleString()} m` : '—', climb),
+    pb('trophy', 'Best finish', finish ? ordinal(finish.position) : '—', finish),
   ].join('');
 }
 
+function posBadge(r) {
+  if (!r.position) return '';
+  return `<span class="pos ${r.position === 1 ? 'p1' : r.position <= 3 ? 'pod' : ''}">${ordinal(r.position)}</span>`;
+}
+function rideCard(r) {
+  return `<button class="ride-card" data-edit="${r.id}">
+    <div class="rc-top"><span class="pill ${r.type}">${TYPES[r.type]}</span><span>${fmtDate(r.date)}</span>${posBadge(r)}</div>
+    <div class="rc-name">${esc(r.name)}</div>
+    <div class="rc-stats">
+      <div>${fmtKm(r.distance)}<span>km</span></div>
+      <div>${fmtDuration(r.time, false).replace(' ', ' ')}<span>time</span></div>
+      <div>${fmtKm(Metrics.speed(r))}<span>km/h</span></div>
+      <div>${Math.round(r.elevation).toLocaleString()}<span>m up</span></div>
+    </div>
+    ${r.notes ? `<div class="rc-notes">${esc(r.notes)}</div>` : ''}
+  </button>`;
+}
+function emptyCard() {
+  return `<div class="card empty-card"><div class="ic">${icon('bike')}</div><h3>No rides yet</h3>
+    <p>Put your phone on your bike and tap <b>Start ride</b>, or add a ride you've already done.</p>
+    <div class="btn-row" style="justify-content:center"><button class="go" data-act="ride">${icon('play')}Start ride</button><button data-act="add">${icon('plus')}Add ride</button></div></div>`;
+}
+function renderRecent() {
+  const list = Store.rides.slice().sort((a, b) => b.date.localeCompare(a.date) || b.updatedAt - a.updatedAt).slice(0, 3);
+  $('#recent').innerHTML = list.length ? list.map(rideCard).join('') : emptyCard();
+}
+
 /* =================================================================
-   10. RESULTS TABLE
+   8. RIDES VIEW (table on desktop, cards on phones)
    ================================================================= */
 const SORT_GET = {
   date: r => r.date, name: r => r.name.toLowerCase(), type: r => r.type, distance: r => r.distance,
@@ -953,21 +1417,22 @@ const SORT_GET = {
   elevation: r => r.elevation, position: r => r.position,
 };
 
-function renderTable(rides) {
+function renderRides() {
+  const all = Store.rides;
   const t = $('#fType').value, p = +$('#fPos').value || null, from = $('#fFrom').value, to = $('#fTo').value;
   const q = $('#fText').value.trim().toLowerCase();
-  let list = rides.filter(r =>
-    (!t || r.type === t) &&
-    (!p || (r.position != null && r.position <= p)) &&
+  const active = [t, p, from, to, q].filter(Boolean).length;
+  let list = all.filter(r =>
+    (!t || r.type === t) && (!p || (r.position != null && r.position <= p)) &&
     (!from || r.date >= from) && (!to || r.date <= to) &&
     (!q || (r.name + ' ' + r.notes).toLowerCase().includes(q)));
-  const g = SORT_GET[Prefs.sortKey], dir = Prefs.sortDir;
+  const g = SORT_GET[Prefs.sortKey] || SORT_GET.date, dir = Prefs.sortDir;
   list.sort((a, b) => {
     const A = g(a), B = g(b);
-    if (A == null && B == null) return 0;
-    if (A == null) return 1;            // nulls always last
+    if (A == null && B == null) return b.date.localeCompare(a.date);
+    if (A == null) return 1;            // missing values always last
     if (B == null) return -1;
-    return (A < B ? -1 : A > B ? 1 : 0) * dir;
+    return (A < B ? -1 : A > B ? 1 : 0) * dir || b.date.localeCompare(a.date);
   });
   $$('th[data-key]').forEach(th => {
     const on = th.dataset.key === Prefs.sortKey;
@@ -975,25 +1440,203 @@ function renderTable(rides) {
     th.querySelector('.arrow').textContent = on ? (dir > 0 ? '↑' : '↓') : '↕';
     th.setAttribute('aria-sort', on ? (dir > 0 ? 'ascending' : 'descending') : 'none');
   });
-  $('#tableCount').textContent = `${list.length} of ${rides.length} rides in range`;
+  const sortVal = `${Prefs.sortKey}:${Prefs.sortDir}`;
+  if ([...$('#fSort').options].some(o => o.value === sortVal)) $('#fSort').value = sortVal;
+  $('#tableCount').textContent = all.length ? `${list.length === all.length ? '' : list.length + ' of '}${all.length} ride${all.length === 1 ? '' : 's'}` : '';
+  $('#filterCount').textContent = active ? `${active} filter${active === 1 ? '' : 's'} on` : `${list.length} rides`;
+
+  const none = all.length ? `<div class="empty">No rides match these filters.</div>` : emptyCard();
   $('#tbody').innerHTML = list.length ? list.map(r => `
-    <tr>
+    <tr data-edit="${r.id}" tabindex="0">
       <td>${fmtDate(r.date)}</td>
       <td class="name">${esc(r.name)}${r.notes ? `<span class="note" title="${esc(r.notes)}">${esc(r.notes)}</span>` : ''}</td>
-      <td><span class="pill ${r.type === 'race' ? 'race' : ''}">${TYPES[r.type]}</span></td>
+      <td><span class="pill ${r.type}">${TYPES[r.type]}</span></td>
       <td class="num">${fmtKm(r.distance)}</td>
       <td class="num">${fmtDuration(r.time)}</td>
       <td class="num">${fmtKm(Metrics.speed(r))}</td>
       <td class="num">${r.power ?? '–'}</td>
       <td class="num">${r.hr ?? '–'}</td>
       <td class="num">${r.elevation.toLocaleString()}</td>
-      <td class="num">${r.position ? `<span class="pos ${r.position === 1 ? 'p1' : ''}">${ordinal(r.position)}</span>` : '–'}</td>
-      <td class="row-actions">
-        <button class="ghost" data-edit="${r.id}" aria-label="Edit ${esc(r.name)}">Edit</button>
-        <button class="ghost danger" data-del="${r.id}" aria-label="Delete ${esc(r.name)}">✕</button>
-      </td>
-    </tr>`).join('') : `<tr><td colspan="11" class="empty">${Store.rides.length ? 'No rides match these filters.' : 'No rides yet. Tap <b>▶ Ride</b> to record one with your phone, or <b>+ Add ride</b> to enter one.'}</td></tr>`;
+      <td class="num">${posBadge(r) || '–'}</td>
+    </tr>`).join('') : `<tr><td colspan="10" style="cursor:default">${none}</td></tr>`;
+  $('#rideCards').innerHTML = list.length ? list.map(rideCard).join('') : none;
 }
+
+/* =================================================================
+   9. SETTINGS VIEW
+   ================================================================= */
+function initials() {
+  const n = Profile.data.name.trim();
+  if (n) return n.split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
+  if (Account.user?.email) return Account.user.email[0].toUpperCase();
+  return '';
+}
+function renderAvatar() {
+  const a = $('#avatarBtn'), i = initials();
+  a.innerHTML = i ? esc(i) : icon('user');
+}
+function agoText(t) {
+  const s = Math.round((Date.now() - t) / 1000);
+  return s < 45 ? 'just now' : s < 3600 ? `${Math.round(s / 60)} min ago` : new Date(t).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+}
+function renderSyncChip() {
+  const dot = $('#syncDot'), lbl = $('#syncLabel');
+  let cls = '', txt = 'On this device';
+  if (Account.user) {
+    const p = Account.pending();
+    const map = { syncing: ['spin', 'Syncing…'], ok: [p ? 'warn' : 'ok', p ? 'Changes waiting' : 'Synced'], offline: ['warn', 'Offline · will sync later'], error: ['bad', 'Sync problem'], idle: ['warn', 'Waiting to sync'] };
+    [cls, txt] = map[Account.status] || map.idle;
+  } else if (Cloud.col) { cls = 'ok'; txt = 'Synced with Claude'; }
+  dot.className = 'dot ' + cls; lbl.textContent = txt;
+  $('#syncChip').classList.toggle('hidden', !Account.user && !Cloud.col);   // nothing to show when rides are local-only
+  $('#syncChip').title = txt;
+}
+function renderAccountStatus() {
+  const el = $('#acctStatus'); if (!el) return;
+  const p = Account.pending();
+  el.textContent = Account.status === 'syncing' ? 'Syncing…'
+    : Account.status === 'error' ? `Couldn't sync: ${Account.error}`
+    : Account.status === 'offline' ? `You're offline. ${p} change${p === 1 ? '' : 's'} will sync when you're back online.`
+    : Account.lastSync ? `Synced ${agoText(Account.lastSync)} · ${Store.rides.length} ride${Store.rides.length === 1 ? '' : 's'} in your account` : 'Connecting…';
+  el.style.color = Account.status === 'error' ? 'var(--danger)' : '';
+}
+
+let authMode = 'signin';
+function renderAccount() {
+  renderAvatar(); renderSyncChip();
+  const body = $('#accountBody');
+  $('#deleteAllHint').textContent = Account.user ? 'Removes every ride from this phone and your account' : 'Removes every ride from this device';
+  if (!Account.configured) {
+    body.innerHTML = Cloud.col
+      ? `<p class="sub" style="margin:0">Inside claude.ai your rides sync with your Claude account automatically.</p>`
+      : `<p class="sub" style="margin:0 0 4px">Accounts aren't switched on for this copy of Ride Log yet, so your rides are saved on this device only. Use <b>Export CSV</b> below for backups.</p>
+         <p class="sub" style="margin:0">To switch on sign-in and sync, follow <code>supabase/README.md</code> in the project.</p>`;
+    return;
+  }
+  if (!Account.ready) { body.innerHTML = `<p class="sub">Loading…</p>`; return; }
+  if (!Account.sb) { body.innerHTML = `<p class="err">Sign-in couldn't load${Account.error ? ': ' + esc(Account.error) : ''}. Check your connection and reopen the app.</p>`; return; }
+
+  if (Account.user && Account.recovery) {
+    body.innerHTML = `<p class="sub">Choose a new password for <b>${esc(Account.user.email || '')}</b>.</p>
+      <form id="pwForm" class="form-grid"><label class="field full"><span>New password</span><input type="password" name="pw" minlength="8" autocomplete="new-password" required></label></form>
+      <div class="err" id="authErr"></div><div class="btn-row"><button class="primary" id="pwSave">Save password</button></div>`;
+    $('#pwSave').onclick = async () => {
+      const pw = $('#pwForm').elements.pw.value;
+      if (pw.length < 8) { $('#authErr').textContent = 'Use at least 8 characters.'; return; }
+      try { await Account.updatePassword(pw); toast('Password updated'); renderAccount(); } catch (e) { $('#authErr').textContent = e.message; }
+    };
+    return;
+  }
+
+  if (Account.user) {
+    body.innerHTML = `<div class="acct" style="margin-top:12px"><span class="avatar lg">${esc(initials()) || icon('user')}</span>
+        <div class="who"><b>${esc(Profile.data.name || 'Signed in')}</b><span class="sub">${esc(Account.user.email || '')}</span></div></div>
+      <p class="sub" id="acctStatus" style="margin:14px 0 0"></p>
+      <div class="btn-row"><button id="btnSyncNow">Sync now</button><button class="danger" id="btnSignOut">Sign out</button></div>`;
+    $('#btnSyncNow').onclick = () => Account.sync();
+    $('#btnSignOut').onclick = () => Account.signOut();
+    renderAccountStatus();
+    return;
+  }
+
+  const up = authMode === 'signup', reset = authMode === 'reset';
+  body.innerHTML = `
+    <p class="sub">${reset ? 'We’ll email you a link to set a new password.' : 'Sign in to back up your rides and keep your phone and computer in sync.'}</p>
+    ${reset ? '' : `<div class="seg full" style="margin-bottom:14px"><button data-auth="signin" class="${up ? '' : 'on'}">Sign in</button><button data-auth="signup" class="${up ? 'on' : ''}">Create account</button></div>`}
+    <form id="authForm" class="form-grid" novalidate>
+      <label class="field full"><span>Email</span><input type="email" name="email" autocomplete="email" required inputmode="email"></label>
+      ${reset ? '' : `<label class="field full"><span>Password${up ? ' <em>(8+ characters)</em>' : ''}</span><input type="password" name="pw" autocomplete="${up ? 'new-password' : 'current-password'}" required minlength="${up ? 8 : 1}"></label>`}
+    </form>
+    <div class="err" id="authErr"></div>
+    <div class="btn-row" style="align-items:center">
+      <button class="primary" id="authGo">${reset ? 'Send reset link' : up ? 'Create account' : 'Sign in'}</button>
+      ${reset ? '<button class="link-btn" data-auth="signin">Back to sign in</button>' : up ? '' : '<button class="link-btn" data-auth="reset">Forgot password?</button>'}
+    </div>`;
+  body.querySelectorAll('[data-auth]').forEach(b => b.onclick = e => { e.preventDefault(); authMode = b.dataset.auth; renderAccount(); });
+  const go = async e => {
+    e?.preventDefault();
+    const f = $('#authForm').elements, email = f.email.value.trim(), pw = f.pw?.value || '';
+    const err = $('#authErr'); err.textContent = ''; err.className = 'err';
+    if (!/^\S+@\S+\.\S+$/.test(email)) { err.textContent = 'Enter a valid email address.'; return; }
+    if (!reset && up && pw.length < 8) { err.textContent = 'Password must be at least 8 characters.'; return; }
+    if (!reset && !pw) { err.textContent = 'Enter your password.'; return; }
+    const btn = $('#authGo'); btn.disabled = true;
+    try {
+      if (reset) { await Account.resetPassword(email); err.className = 'ok-msg'; err.textContent = 'Check your email for the reset link.'; }
+      else if (up) {
+        const signedIn = await Account.signUp(email, pw);
+        if (!signedIn) { err.className = 'ok-msg'; err.textContent = 'Almost done: check your email and tap the confirmation link, then sign in here.'; authMode = 'signin'; }
+      } else await Account.signIn(email, pw);
+    } catch (x) { err.textContent = friendlyAuthError(x); }
+    btn.disabled = false;
+  };
+  $('#authGo').onclick = go;
+  $('#authForm').onsubmit = go;
+}
+function friendlyAuthError(e) {
+  const m = (e?.message || String(e));
+  if (/invalid login/i.test(m)) return 'Wrong email or password.';
+  if (/not confirmed/i.test(m)) return 'Please confirm your email first (check your inbox), then sign in.';
+  if (/already registered/i.test(m)) return 'That email already has an account. Try signing in.';
+  if (/rate limit|too many/i.test(m)) return 'Too many attempts. Please wait a minute and try again.';
+  if (/fetch|network/i.test(m)) return 'Can’t reach the server. Check your connection.';
+  return m;
+}
+
+function fillProfileForm() {
+  const f = $('#profileForm').elements;
+  for (const k of ['name', 'goal', 'weight', 'ftp', 'maxHr']) if (document.activeElement !== f[k]) f[k].value = Profile.data[k] ?? '';
+}
+let profileTimer;
+$('#profileForm').addEventListener('input', () => {
+  clearTimeout(profileTimer);
+  profileTimer = setTimeout(() => {
+    const f = $('#profileForm').elements, n = v => v === '' ? null : +v;
+    const goal = Math.round(+f.goal.value);
+    Profile.set({ name: f.name.value.trim(), goal: goal > 0 ? goal : Profile.data.goal, weight: n(f.weight.value), ftp: n(f.ftp.value), maxHr: n(f.maxHr.value) });
+    $('#profileSaved').textContent = 'Saved ✓';
+    setTimeout(() => $('#profileSaved').textContent = 'Changes save automatically.', 1600);
+    renderHero(); renderAvatar();
+  }, 400);
+});
+$('#profileForm').addEventListener('submit', e => e.preventDefault());
+
+/* theme */
+function systemDark() { return matchMedia('(prefers-color-scheme: dark)').matches; }
+function applyTheme() {
+  if (Prefs.theme) document.documentElement.dataset.theme = Prefs.theme;
+  else delete document.documentElement.dataset.theme;
+  const dark = Prefs.theme ? Prefs.theme === 'dark' : systemDark();
+  $('#metaTheme').setAttribute('content', dark ? '#0e0e0d' : '#f5f5f3');
+  $$('[data-theme-opt]').forEach(b => b.classList.toggle('on', b.dataset.themeOpt === (Prefs.theme || 'system')));
+}
+$('#themePick').onclick = e => {
+  const b = e.target.closest('[data-theme-opt]'); if (!b) return;
+  Prefs.theme = b.dataset.themeOpt === 'system' ? null : b.dataset.themeOpt; savePrefs(); applyTheme(); render();
+};
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (!Prefs.theme) { applyTheme(); render(); } });
+
+/* =================================================================
+   10. NAVIGATION
+   ================================================================= */
+const VIEWS = ['home', 'rides', 'settings'];
+let currentView = 'home';
+function route() {
+  const h = location.hash.slice(1);
+  const v = VIEWS.includes(h) ? h : 'home';
+  const changed = v !== currentView;
+  currentView = v;
+  VIEWS.forEach(x => $('#view-' + x).classList.toggle('hidden', x !== v));
+  $$('.tab[data-view]').forEach(t => { t.classList.toggle('on', t.dataset.view === v); t.setAttribute('aria-current', t.dataset.view === v ? 'page' : 'false'); });
+  if (v === 'settings') { fillProfileForm(); renderAccount(); }
+  if (v === 'home') { trendChart?.resize(); volChart?.resize(); }
+  if (changed) window.scrollTo(0, 0);
+}
+$$('.tab[data-view]').forEach(t => t.onclick = () => { location.hash = '#' + t.dataset.view; });
+$('#avatarBtn').onclick = () => { location.hash = '#settings'; };
+$('#syncChip').onclick = () => { location.hash = '#settings'; if (Account.user) Account.sync(); };
+$('#goalRing').onclick = () => { location.hash = '#settings'; setTimeout(() => $('#profileForm').elements.goal.focus(), 50); };
+addEventListener('hashchange', route);
 
 /* =================================================================
    11. LIVE RIDE MODE — the phone as a bike computer
@@ -1172,11 +1815,10 @@ const Live = {
     }
   },
 };
-
 function syncRideBtn() {
-  const b = $('#btnRide'), on = Live.s && Live.s.status !== 'finished';
-  b.classList.toggle('rec', !!on); b.classList.toggle('go', !on);
-  b.textContent = !Live.s ? '▶ Ride' : Live.s.status === 'running' ? '● Recording' : Live.s.status === 'paused' ? '❚❚ Paused' : '● Unsaved ride';
+  const b = $('#btnRide'), on = Live.s && Live.s.status === 'running';
+  b.classList.toggle('rec', !!(Live.s && Live.s.status !== 'finished'));
+  $('#rideLabel').textContent = !Live.s ? 'Ride' : on ? 'Recording' : Live.s.status === 'paused' ? 'Paused' : 'Unsaved';
 }
 $('#btnRide').onclick = () => Live.open();
 $('#liveClose').onclick = () => Live.close();
@@ -1195,45 +1837,48 @@ function syncSeg(id, attr, val) { $$(`#${id} button`).forEach(b => b.classList.t
 function render() {
   const rides = ridesInRange();
   const [, , label] = rangeBounds();
-  $('#rangeLabel').textContent = `${label} · ${rides.length} rides · personal bests & goal use all data`;
+  $('#rangeLabel').textContent = `${label} · ${rides.length} ride${rides.length === 1 ? '' : 's'}`;
   syncSeg('rangeSeg', 'range', Prefs.range);
   syncSeg('metricSeg', 'metric', Prefs.metric);
   syncSeg('periodSeg', 'period', Prefs.period);
+  renderHero();
   renderTiles(rides);
   renderTrend(rides);
   renderVolume(rides);
-  renderGoal();
   renderPBs();
-  renderTable(rides);
+  renderRecent();
+  renderRides();
+  renderAvatar();
+  renderSyncChip();
 }
 
 $('#rangeSeg').onclick = e => { const b = e.target.closest('button'); if (b) { Prefs.range = b.dataset.range; savePrefs(); render(); } };
 $('#metricSeg').onclick = e => { const b = e.target.closest('button'); if (b) { Prefs.metric = b.dataset.metric; savePrefs(); syncSeg('metricSeg', 'metric', Prefs.metric); renderTrend(ridesInRange()); } };
 $('#periodSeg').onclick = e => { const b = e.target.closest('button'); if (b) { Prefs.period = b.dataset.period; savePrefs(); syncSeg('periodSeg', 'period', Prefs.period); renderVolume(ridesInRange()); } };
 
-$('#goalInput').addEventListener('change', e => { const v = Math.round(+e.target.value); if (v > 0) { Prefs.goal = v; savePrefs(); } renderGoal(); });
-
-['#fType', '#fPos', '#fFrom', '#fTo', '#fText'].forEach(s => $(s).addEventListener('input', () => renderTable(ridesInRange())));
-$('#fReset').onclick = () => { ['#fType', '#fPos', '#fFrom', '#fTo', '#fText'].forEach(s => $(s).value = ''); renderTable(ridesInRange()); };
-
+['#fType', '#fPos', '#fFrom', '#fTo', '#fText'].forEach(s => $(s).addEventListener('input', renderRides));
+$('#fSort').addEventListener('change', e => { const [k, d] = e.target.value.split(':'); Prefs.sortKey = k; Prefs.sortDir = +d; savePrefs(); renderRides(); });
+$('#fReset').onclick = () => { ['#fType', '#fPos', '#fFrom', '#fTo', '#fText'].forEach(s => $(s).value = ''); Prefs.sortKey = 'date'; Prefs.sortDir = -1; savePrefs(); renderRides(); };
 $$('th[data-key]').forEach(th => th.addEventListener('click', () => {
   const k = th.dataset.key;
   if (Prefs.sortKey === k) Prefs.sortDir *= -1;
   else { Prefs.sortKey = k; Prefs.sortDir = (k === 'name' || k === 'type' || k === 'position') ? 1 : -1; }
-  savePrefs(); renderTable(ridesInRange());
+  savePrefs(); renderRides();
 }));
 
-$('#tbody').addEventListener('click', e => {
-  const ed = e.target.closest('[data-edit]'), del = e.target.closest('[data-del]');
-  if (ed) openForm(Store.rides.find(r => r.id === ed.dataset.edit));
-  if (del) {
-    const r = Store.rides.find(x => x.id === del.dataset.del);
-    if (r && confirm(`Delete "${r.name}" (${fmtDate(r.date)})?`)) { Store.remove(r.id); toast('Ride deleted'); render(); }
-  }
+// open a ride (cards, table rows) and empty-state buttons, anywhere on the page
+document.addEventListener('click', e => {
+  const ed = e.target.closest('[data-edit]');
+  if (ed) { const r = Store.rides.find(x => x.id === ed.dataset.edit); if (r) openForm(r); return; }
+  const act = e.target.closest('[data-act]');
+  if (act) act.dataset.act === 'ride' ? Live.open() : openForm(null);
 });
+$('#tbody').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.dataset.edit) e.target.click(); });
 
 $('#btnAdd').onclick = () => openForm(null);
-$('#btnExport').onclick = () => download(`rides-${isoDate(new Date())}.csv`, toCSV(Store.rides));
+$('#heroAdd').onclick = () => openForm(null);
+$('#heroRide').onclick = () => Live.open();
+$('#btnExport').onclick = () => Store.rides.length ? download(`rides-${isoDate(new Date())}.csv`, toCSV(Store.rides)) : toast('No rides to export yet');
 $('#btnImport').onclick = () => $('#fileInput').click();
 $('#fileInput').onchange = async e => {
   const file = e.target.files[0]; if (!file) return;
@@ -1241,19 +1886,12 @@ $('#fileInput').onchange = async e => {
   catch (err) { toast('Import failed: ' + err.message); }
   e.target.value = '';
 };
-
-/* theme */
-function applyTheme() {
-  if (Prefs.theme) document.documentElement.dataset.theme = Prefs.theme;
-  else delete document.documentElement.dataset.theme;
-  const dark = Prefs.theme ? Prefs.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
-  $('#btnTheme').textContent = dark ? '☀️' : '🌙';
-}
-$('#btnTheme').onclick = () => {
-  const dark = Prefs.theme ? Prefs.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
-  Prefs.theme = dark ? 'light' : 'dark'; savePrefs(); applyTheme(); render();
+$('#btnDeleteAll').onclick = () => {
+  if (!Store.rides.length) { toast('No rides to delete'); return; }
+  const n = Store.rides.length;
+  if (!confirm(`Delete all ${n} rides${Account.user ? ' from this phone AND your account' : ''}? This can't be undone. Consider exporting a CSV first.`)) return;
+  Store.removeAll(); render(); toast(`Deleted ${n} rides`);
 };
-matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (!Prefs.theme) { applyTheme(); render(); } });
 
 /* keyboard shortcut: "n" opens new-ride form */
 document.addEventListener('keydown', e => {
@@ -1262,8 +1900,6 @@ document.addEventListener('keydown', e => {
 
 /* =================================================================
    13. INSTALLABLE APP (PWA)
-   Offline cache via sw.js, an Install button where the browser supports
-   it, and instructions for iPhone, where installing is manual.
    ================================================================= */
 const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -1271,11 +1907,17 @@ let installEvt = null;
 if ('serviceWorker' in navigator && window.top === window && (location.protocol === 'https:' || location.hostname === 'localhost')) {
   addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(e => console.warn('Offline cache unavailable', e)));
 }
-addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; $('#btnInstall').classList.remove('hidden'); });
-addEventListener('appinstalled', () => { installEvt = null; $('#btnInstall').classList.add('hidden'); toast('Ride Log installed'); });
-if (isIOS && !standalone && window.top === window && location.protocol === 'https:') $('#btnInstall').classList.remove('hidden');
+function renderInstall() {
+  const b = $('#btnInstall'), hint = $('#installHint');
+  if (standalone) { b.classList.add('hidden'); hint.textContent = 'Installed. Ride Log works offline.'; return; }
+  if (window.top !== window) { b.classList.add('hidden'); hint.textContent = 'Open Ride Log from its own web address to install it.'; return; }
+  b.classList.toggle('hidden', !installEvt && !isIOS);
+  if (!installEvt && !isIOS) hint.textContent = 'Use your browser menu → "Install app" or "Add to Home screen".';
+}
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; renderInstall(); });
+addEventListener('appinstalled', () => { installEvt = null; renderInstall(); toast('Ride Log installed'); });
 $('#btnInstall').onclick = async () => {
-  if (installEvt) { installEvt.prompt(); await installEvt.userChoice.catch(() => {}); installEvt = null; $('#btnInstall').classList.add('hidden'); }
+  if (installEvt) { installEvt.prompt(); await installEvt.userChoice.catch(() => {}); installEvt = null; renderInstall(); }
   else alert('To install on iPhone/iPad:\n\n1. Tap the Share button (square with an arrow) in Safari\n2. Choose "Add to Home Screen"\n3. Tap Add\n\nRide Log then opens full-screen from your home screen.');
 };
 /** Ask the browser not to clear our saved rides when the phone is low on space. */
@@ -1283,18 +1925,23 @@ function keepDataSafe() { try { navigator.storage?.persist?.(); } catch {} }
 
 /* boot */
 if (typeof Chart === 'undefined') {
-  document.querySelectorAll('.chart-box').forEach(b => b.innerHTML = '<p class="empty">Charts need an internet connection to load Chart.js.</p>');
-  window.Chart = function () { return { destroy() {} }; };
+  window.Chart = function () { return { destroy() {}, resize() {} }; };
+  $$('.chart-box').forEach(b => b.insertAdjacentHTML('beforeend', '<div class="chart-empty">Charts couldn’t load.</div>'));
 } else {
   Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
 }
+$('#versionText').textContent = `Ride Log ${APP_VERSION}`;
 Store.load();
+Profile.load();
 applyTheme();
+route();
 render();
+renderInstall();
 Live.restore();
 if (!Live.s && new URLSearchParams(location.search).has('ride')) Live.open();
 if (Live.s) { syncRideBtn(); Live.open(); if (Live.s.status === 'paused') Live.showMsg('A ride was still in progress. Resume it or finish to save it.', true); }
-Cloud.init().catch(() => Cloud.setLabel('Saved on this device'));
+Account.init().catch(e => { Account.error = e.message; Account.ready = true; renderAccount(); });
+Cloud.init().catch(() => {});
 </script>
 </body>
 </html>
