@@ -1,0 +1,1303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ride Log</title>
+<meta name="description" content="Cycling results dashboard and phone bike computer.">
+<meta name="theme-color" content="#2a78d6">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Ride Log">
+<script src="vendor/chart.umd.min.js"></script>
+<style>
+/* ============================================================
+   THEME TOKENS
+   ============================================================ */
+:root {
+  color-scheme: light;
+  --bg: #f4f4f2;
+  --surface: #fcfcfb;
+  --surface-2: #f0efec;
+  --border: #e2e1dc;
+  --text: #0b0b0b;
+  --text-2: #52514e;
+  --text-3: #7a7974;
+  --grid: rgba(0,0,0,.07);
+  --accent: #2a78d6;        /* series 1: speed / distance */
+  --accent-soft: rgba(42,120,214,.12);
+  --power: #eb6834;         /* series 2 */
+  --hr: #1baf7a;            /* series 3 */
+  --good: #008300;
+  --danger: #c93b3a;
+  --shadow: 0 1px 2px rgba(0,0,0,.05), 0 4px 14px rgba(0,0,0,.04);
+  --radius: 14px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #111110; --surface: #1a1a19; --surface-2: #232321; --border: #2f2f2c;
+    --text: #f0efec; --text-2: #c3c2b7; --text-3: #8f8e86; --grid: rgba(255,255,255,.08);
+    --accent: #3987e5; --accent-soft: rgba(57,135,229,.18);
+    --power: #d95926; --hr: #199e70; --good: #0ca30c; --danger: #e66767;
+    --shadow: 0 1px 2px rgba(0,0,0,.4);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #111110; --surface: #1a1a19; --surface-2: #232321; --border: #2f2f2c;
+  --text: #f0efec; --text-2: #c3c2b7; --text-3: #8f8e86; --grid: rgba(255,255,255,.08);
+  --accent: #3987e5; --accent-soft: rgba(57,135,229,.18);
+  --power: #d95926; --hr: #199e70; --good: #0ca30c; --danger: #e66767;
+  --shadow: 0 1px 2px rgba(0,0,0,.4);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--text);
+  font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 1180px; margin: 0 auto; padding: 20px 16px 60px; }
+
+/* ---------- header ---------- */
+header.top {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  flex-wrap: wrap; margin-bottom: 18px;
+}
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand h1 { font-size: 1.35rem; margin: 0; letter-spacing: -.01em; }
+.brand svg { color: var(--accent); }
+.toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+button, .btn {
+  font: inherit; font-size: .9rem; cursor: pointer;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text);
+  padding: 8px 14px; border-radius: 10px; transition: background .15s, border-color .15s;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+button:hover, .btn:hover { background: var(--surface-2); }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.primary:hover { filter: brightness(1.08); background: var(--accent); }
+button.ghost { background: transparent; }
+button.danger { color: var(--danger); }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+
+/* segmented control */
+.seg { display: inline-flex; background: var(--surface-2); border-radius: 10px; padding: 3px; gap: 2px; }
+.seg button { border: 0; background: transparent; padding: 6px 12px; border-radius: 8px; color: var(--text-2); }
+.seg button.on { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
+
+/* ---------- cards ---------- */
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px;
+}
+.card h2 { font-size: 1rem; margin: 0; }
+.card-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.sub { color: var(--text-3); font-size: .82rem; }
+
+.grid { display: grid; gap: 16px; }
+.tiles { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); margin-bottom: 16px; }
+.two { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); margin-bottom: 16px; }
+.grid > * { min-width: 0; }
+@media (max-width: 860px) { .two { grid-template-columns: minmax(0, 1fr); } }
+
+.tile { padding: 16px 18px; }
+.tile .label { color: var(--text-2); font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; }
+.tile .value { font-size: 1.75rem; font-weight: 650; margin-top: 4px; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.tile .value small { font-size: .95rem; font-weight: 500; color: var(--text-2); margin-left: 2px; }
+.tile .hint { color: var(--text-3); font-size: .8rem; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.chart-box { position: relative; height: 290px; }
+
+/* filter bar */
+.filterbar {
+  display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.filterbar .sub { margin-left: auto; }
+
+/* goal */
+.goal { display: flex; flex-direction: column; gap: 10px; }
+.goal-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.goal-big { font-size: 1.5rem; font-weight: 650; font-variant-numeric: tabular-nums; }
+.bar { height: 12px; background: var(--surface-2); border-radius: 99px; overflow: hidden; }
+.bar > span { display: block; height: 100%; background: var(--accent); border-radius: 99px; transition: width .6s cubic-bezier(.2,.8,.2,1); }
+.bar.done > span { background: var(--good); }
+.goal input { width: 90px; }
+
+/* PBs */
+.pbs { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.pb { background: var(--surface-2); border-radius: 12px; padding: 14px; }
+.pb .label { font-size: .8rem; color: var(--text-2); display: flex; align-items: center; gap: 6px; }
+.pb .value { font-size: 1.35rem; font-weight: 650; margin: 4px 0 2px; font-variant-numeric: tabular-nums; }
+.pb .meta { font-size: .8rem; color: var(--text-3); }
+
+/* ---------- table ---------- */
+.table-filters { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; align-items: end; }
+.table-filters label { display: flex; flex-direction: column; gap: 4px; font-size: .78rem; color: var(--text-2); }
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+table { width: 100%; border-collapse: collapse; font-size: .88rem; font-variant-numeric: tabular-nums; }
+th, td { padding: 10px 10px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+th { font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text-2); font-weight: 600; cursor: pointer; user-select: none; position: sticky; top: 0; background: var(--surface); }
+th.nosort { cursor: default; }
+th .arrow { opacity: .35; margin-left: 3px; }
+th.sorted .arrow { opacity: 1; color: var(--accent); }
+td.num, th.num { text-align: right; }
+tbody tr:hover { background: var(--surface-2); }
+td.name { white-space: normal; min-width: 160px; }
+td.name .note { color: var(--text-3); font-size: .78rem; display: block; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pill { display: inline-block; padding: 2px 9px; border-radius: 99px; font-size: .75rem; font-weight: 600; background: var(--surface-2); color: var(--text-2); }
+.pill.race { background: var(--accent-soft); color: var(--accent); }
+.pos { font-weight: 650; }
+.pos.p1 { color: var(--good); }
+.row-actions button { padding: 4px 8px; font-size: .8rem; }
+.empty { text-align: center; color: var(--text-3); padding: 28px 0; }
+
+/* ---------- form / dialog ---------- */
+dialog {
+  border: 1px solid var(--border); border-radius: 16px; padding: 0; width: min(620px, calc(100vw - 32px));
+  background: var(--surface); color: var(--text); box-shadow: 0 20px 60px rgba(0,0,0,.3);
+}
+dialog::backdrop { background: rgba(0,0,0,.45); backdrop-filter: blur(2px); }
+dialog form { padding: 20px; }
+dialog h2 { margin: 0 0 14px; font-size: 1.1rem; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.form-grid .full { grid-column: 1 / -1; }
+@media (max-width: 520px) { .form-grid { grid-template-columns: 1fr; } }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field span { font-size: .8rem; color: var(--text-2); font-weight: 500; }
+.field span em { font-style: normal; color: var(--text-3); font-weight: 400; }
+input, select, textarea {
+  font: inherit; font-size: .92rem; color: var(--text); background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: 9px; padding: 8px 10px; width: 100%;
+}
+textarea { resize: vertical; min-height: 64px; }
+.field.invalid input { border-color: var(--danger); }
+.err { color: var(--danger); font-size: .78rem; min-height: 1em; }
+.form-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.hidden { display: none !important; }
+
+/* ---------- live ride mode ---------- */
+button.go { background: var(--good); border-color: var(--good); color: #fff; }
+button.go:hover { background: var(--good); filter: brightness(1.08); }
+#btnRide.rec { background: var(--danger); border-color: var(--danger); color: #fff; }
+.live {
+  position: fixed; inset: 0; z-index: 50; background: var(--bg); color: var(--text);
+  display: flex; flex-direction: column; padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+  overflow-y: auto;
+}
+.live-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.live-status { font-size: .85rem; color: var(--text-2); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--text-3); display: inline-block; }
+.dot.ok { background: var(--good); } .dot.warn { background: #eda100; } .dot.bad { background: var(--danger); }
+.dot.rec { background: var(--danger); animation: blink 1.2s infinite; }
+@keyframes blink { 50% { opacity: .25; } }
+.live-main { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 14px; max-width: 640px; width: 100%; margin: 0 auto; padding: 12px 0; }
+.live-speed { text-align: center; }
+.live-speed .v { font-size: clamp(5rem, 28vw, 9rem); font-weight: 700; line-height: 1; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+.live-speed .u { color: var(--text-2); font-size: 1.1rem; }
+.live-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.live-cell { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; }
+.live-cell .l { font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; color: var(--text-2); }
+.live-cell .v { font-size: clamp(1.6rem, 8vw, 2.4rem); font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.live-cell .v small { font-size: .9rem; color: var(--text-2); font-weight: 500; margin-left: 3px; }
+.live-msg { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--danger); border-radius: 10px; padding: 12px 14px; font-size: .9rem; }
+.live-msg.info { border-left-color: var(--accent); }
+.live-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; max-width: 640px; width: 100%; margin: 0 auto; }
+.live-actions button { justify-content: center; font-size: 1.15rem; font-weight: 600; min-height: 64px; border-radius: 16px; }
+.live-actions button.wide { grid-column: 1 / -1; }
+
+.toast {
+  position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%) translateY(20px);
+  background: var(--text); color: var(--surface); padding: 10px 16px; border-radius: 10px;
+  font-size: .9rem; opacity: 0; transition: .25s; pointer-events: none; z-index: 99;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+@media (max-width: 520px) {
+  .tile .value { font-size: 1.45rem; }
+  .chart-box { height: 240px; }
+  .filterbar .sub { margin-left: 0; width: 100%; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="brand">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="5.5" cy="17" r="3.5"/><circle cx="18.5" cy="17" r="3.5"/>
+        <path d="M5.5 17 9 9h6l3.5 8M9 9 12 17h-1M15 9l-1.5-3H11"/>
+      </svg>
+      <div><h1>Ride Log</h1><div class="sub" id="syncLabel">Saved on this device</div></div>
+    </div>
+    <div class="toolbar">
+      <button class="go" id="btnRide">▶ Ride</button>
+      <button class="primary" id="btnAdd">+ Add ride</button>
+      <button id="btnImport" title="Import CSV">Import CSV</button>
+      <button id="btnExport" title="Export CSV">Export CSV</button>
+      <button id="btnInstall" class="hidden" title="Install as an app">⤓ Install app</button>
+      <button id="btnTheme" class="ghost" aria-label="Toggle dark mode" title="Toggle dark mode">🌙</button>
+      <input type="file" id="fileInput" accept=".csv,text/csv" class="hidden">
+    </div>
+  </header>
+
+  <!-- date range filter -->
+  <div class="filterbar">
+    <div class="seg" id="rangeSeg" role="group" aria-label="Date range">
+      <button data-range="30">Last 30 days</button>
+      <button data-range="season">This season</button>
+      <button data-range="all">All time</button>
+    </div>
+    <span class="sub" id="rangeLabel"></span>
+  </div>
+
+  <!-- summary tiles -->
+  <section class="grid tiles" id="tiles"></section>
+
+  <!-- charts -->
+  <section class="grid two">
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h2 id="trendTitle">Average speed</h2>
+          <div class="sub" id="trendSub">km/h per ride</div>
+        </div>
+        <div class="seg" id="metricSeg" role="group" aria-label="Trend metric">
+          <button data-metric="speed">Speed</button>
+          <button data-metric="power">Power</button>
+          <button data-metric="hr">Heart rate</button>
+        </div>
+      </div>
+      <div class="chart-box"><canvas id="trendChart" aria-label="Trend chart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h2>Distance</h2>
+          <div class="sub" id="volSub">km per week</div>
+        </div>
+        <div class="seg" id="periodSeg" role="group" aria-label="Distance period">
+          <button data-period="week">Weekly</button>
+          <button data-period="month">Monthly</button>
+        </div>
+      </div>
+      <div class="chart-box"><canvas id="volChart" aria-label="Distance chart"></canvas></div>
+    </div>
+  </section>
+
+  <!-- goal + PBs -->
+  <section class="grid two">
+    <div class="card goal">
+      <div class="card-head" style="margin-bottom:0">
+        <div>
+          <h2>Monthly goal</h2>
+          <div class="sub" id="goalMonth"></div>
+        </div>
+        <label class="sub" style="display:flex;align-items:center;gap:6px">Target
+          <input type="number" id="goalInput" min="1" step="10"> km
+        </label>
+      </div>
+      <div class="goal-row">
+        <div class="goal-big" id="goalDone"></div>
+        <div class="sub" id="goalLeft"></div>
+      </div>
+      <div class="bar" id="goalBar" role="progressbar" aria-valuemin="0" aria-valuemax="100"><span></span></div>
+      <div class="sub" id="goalPace"></div>
+    </div>
+    <div class="card">
+      <div class="card-head" style="margin-bottom:12px">
+        <div><h2>Personal bests</h2><div class="sub">All time · updates automatically</div></div>
+      </div>
+      <div class="grid pbs" id="pbs"></div>
+    </div>
+  </section>
+
+  <!-- results table -->
+  <section class="card">
+    <div class="card-head">
+      <div><h2>Results</h2><div class="sub" id="tableCount"></div></div>
+    </div>
+    <div class="table-filters">
+      <label>Type
+        <select id="fType">
+          <option value="">All types</option>
+          <option value="race">Race</option>
+          <option value="training">Training ride</option>
+          <option value="group">Group ride</option>
+        </select>
+      </label>
+      <label>Position
+        <select id="fPos">
+          <option value="">Any</option>
+          <option value="1">Wins</option>
+          <option value="3">Podium (top 3)</option>
+          <option value="10">Top 10</option>
+        </select>
+      </label>
+      <label>From <input type="date" id="fFrom"></label>
+      <label>To <input type="date" id="fTo"></label>
+      <label>Search <input type="search" id="fText" placeholder="Name or notes"></label>
+      <button class="ghost" id="fReset">Reset</button>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th data-key="date">Date<span class="arrow">↕</span></th>
+            <th data-key="name">Ride<span class="arrow">↕</span></th>
+            <th data-key="type">Type<span class="arrow">↕</span></th>
+            <th data-key="distance" class="num">Km<span class="arrow">↕</span></th>
+            <th data-key="time" class="num">Time<span class="arrow">↕</span></th>
+            <th data-key="speed" class="num">Km/h<span class="arrow">↕</span></th>
+            <th data-key="power" class="num">W<span class="arrow">↕</span></th>
+            <th data-key="hr" class="num">BPM<span class="arrow">↕</span></th>
+            <th data-key="elevation" class="num">Elev m<span class="arrow">↕</span></th>
+            <th data-key="position" class="num">Pos<span class="arrow">↕</span></th>
+            <th class="nosort"></th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<!-- add / edit form -->
+<dialog id="dlg">
+  <form id="rideForm" novalidate>
+    <h2 id="formTitle">Add ride</h2>
+    <div class="form-grid">
+      <label class="field"><span>Date</span><input type="date" name="date" required></label>
+      <label class="field"><span>Type</span>
+        <select name="type">
+          <option value="training">Training ride</option>
+          <option value="race">Race</option>
+          <option value="group">Group ride</option>
+        </select>
+      </label>
+      <label class="field full"><span>Name</span><input name="name" required maxlength="80" placeholder="e.g. Sunday hill loop"></label>
+      <label class="field"><span>Distance <em>(km)</em></span><input type="number" name="distance" min="0.01" step="any" required></label>
+      <label class="field"><span>Moving time <em>(h:mm:ss)</em></span><input name="time" required placeholder="1:45:00" pattern="^\d{1,3}(:\d{1,2}){0,2}$"></label>
+      <label class="field"><span>Avg power <em>(W, optional)</em></span><input type="number" name="power" min="0" max="2000" step="1"></label>
+      <label class="field"><span>Avg heart rate <em>(bpm, optional)</em></span><input type="number" name="hr" min="30" max="230" step="1"></label>
+      <label class="field"><span>Elevation gain <em>(m)</em></span><input type="number" name="elevation" min="0" step="1" value="0"></label>
+      <label class="field" id="posField"><span>Finishing position</span><input type="number" name="position" min="1" step="1"></label>
+      <label class="field full"><span>Notes</span><textarea name="notes" maxlength="500" placeholder="How did it feel? Weather, tactics, kit…"></textarea></label>
+      <input type="hidden" name="best10k">
+    </div>
+    <div class="err" id="formErr"></div>
+    <div class="form-actions">
+      <button type="button" class="ghost" id="btnCancel">Cancel</button>
+      <button type="submit" class="primary">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- live ride mode (phone as bike computer) -->
+<section class="live hidden" id="live" aria-label="Ride mode">
+  <div class="live-top">
+    <div class="live-status"><span class="dot" id="gpsDot"></span><span id="gpsText">GPS off</span><span id="wakeText"></span></div>
+    <button class="ghost" id="liveClose">Dashboard</button>
+  </div>
+  <div class="live-main">
+    <div class="live-msg hidden" id="liveMsg"></div>
+    <div class="live-speed"><div class="v" id="lvSpeed">0.0</div><div class="u">km/h</div></div>
+    <div class="live-grid">
+      <div class="live-cell"><div class="l">Distance</div><div class="v" id="lvDist">0.00<small>km</small></div></div>
+      <div class="live-cell"><div class="l">Moving time</div><div class="v" id="lvTime">0:00:00</div></div>
+      <div class="live-cell"><div class="l">Avg speed</div><div class="v" id="lvAvg">0.0<small>km/h</small></div></div>
+      <div class="live-cell"><div class="l">Climbing</div><div class="v" id="lvElev">0<small>m</small></div></div>
+      <div class="live-cell"><div class="l">Max speed</div><div class="v" id="lvMax">0.0<small>km/h</small></div></div>
+      <div class="live-cell"><div class="l">Clock</div><div class="v" id="lvClock">--:--</div></div>
+    </div>
+  </div>
+  <div class="live-actions" id="liveActions"></div>
+</section>
+
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+/* =================================================================
+   1. DATA MODEL
+   -----------------------------------------------------------------
+   One Ride record. Kept deliberately flat and unit-explicit so the
+   same shape can later be produced by a live bike computer
+   (GPS / power meter / HR strap) and dropped straight into the store.
+
+   {
+     id:        string   unique id
+     date:      string   ISO date "YYYY-MM-DD"
+     name:      string
+     type:      "training" | "race" | "group"
+     distance:  number   kilometres
+     time:      number   moving time in SECONDS
+     power:     number|null  average watts
+     hr:        number|null  average bpm
+     elevation: number   metres climbed
+     position:  number|null  finishing place (races only)
+     notes:     string
+     best10k:   number|null  fastest 10 km split in seconds (GPS-recorded rides)
+   }
+   ================================================================= */
+const STORAGE_KEY = 'ridelog.v1';
+const PREFS_KEY   = 'ridelog.prefs.v1';
+const TYPES = { training: 'Training ride', race: 'Race', group: 'Group ride' };
+
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+
+/** Normalise any loose object (form, CSV, future device) into a valid Ride or throw. */
+function makeRide(raw) {
+  const num = v => (v === '' || v == null || isNaN(+v)) ? null : +v;
+  const r = {
+    id: raw.id || uid(),
+    date: String(raw.date || '').slice(0, 10),
+    name: String(raw.name || '').trim(),
+    type: TYPES[raw.type] ? raw.type : 'training',
+    distance: num(raw.distance),
+    time: typeof raw.time === 'number' ? raw.time : parseDuration(raw.time),
+    power: num(raw.power),
+    hr: num(raw.hr),
+    elevation: num(raw.elevation) ?? 0,
+    position: num(raw.position),
+    notes: String(raw.notes || '').trim(),
+    best10k: typeof raw.best10k === 'number' ? raw.best10k : (parseDuration(raw.best10k) || null),
+  };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(r.date) || isNaN(new Date(r.date))) throw new Error('Invalid date');
+  if (!r.name) throw new Error('Name is required');
+  if (!(r.distance > 0)) throw new Error('Distance must be greater than 0');
+  if (!(r.time > 0)) throw new Error('Moving time must be like 1:30:00');
+  if (r.type !== 'race') r.position = null;
+  if (r.position != null) r.position = Math.max(1, Math.round(r.position));
+  return r;
+}
+
+/* Derived metrics - pure functions, reusable by a live computer */
+const Metrics = {
+  speed: r => r.distance / (r.time / 3600),                // km/h
+  // Real split from a GPS-recorded ride, otherwise estimated from average speed
+  est10k: r => r.best10k || (r.distance >= 10 ? 10 / Metrics.speed(r) * 3600 : null),
+};
+
+/* ---------- storage ---------- */
+const Store = {
+  rides: [],
+  load() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) { this.rides = JSON.parse(raw).map(makeRide); return; }
+    } catch (e) { console.warn('Could not read saved rides', e); }
+    this.rides = SAMPLE().map(makeRide);
+    this.save();
+  },
+  save() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(this.rides)); } catch (e) { toast('Could not save (storage full or blocked)'); } },
+  upsert(r) {
+    const i = this.rides.findIndex(x => x.id === r.id);
+    i >= 0 ? this.rides[i] = r : this.rides.push(r);
+    this.save(); Cloud.put([r]);
+  },
+  remove(id) { this.rides = this.rides.filter(r => r.id !== id); this.save(); Cloud.del(id); },
+};
+
+/* ---------- optional account sync (claude.ai viewer) ----------
+   When opened as a published claude.ai page, rides are also stored in the
+   viewer's private per-user database so phone and laptop stay in sync.
+   Opened as a local file, the app simply uses localStorage. */
+const Cloud = {
+  col: null, ready: false,
+  setLabel(t) { const el = document.getElementById('syncLabel'); if (el) el.textContent = t; },
+  async init() {
+    if (!window.claude?.use) return;
+    const [db, user] = await Promise.all([claude.use('db'), claude.use('user')]);
+    const uid = user ? await user.id() : null;
+    if (!db || !uid) return;
+    const logDoc = db.doc('data/users/' + uid + '/log');
+    this.col = logDoc.collection('rides');
+    this.setLabel('Syncing…');
+    const timer = setTimeout(() => this.setLabel('Can’t reach sync yet · saved on this device'), 10000);
+    try {
+      // first visit with sync: upload what this device has (samples or your local rides)
+      const meta = await logDoc.get();
+      if (!meta.exists) {
+        for (const r of Store.rides) await this.col.doc(r.id).set({ ...r });
+        await logDoc.set({ seeded: true, version: 1 });
+      }
+    } catch (e) { clearTimeout(timer); this.col = null; this.setLabel('Saved on this device'); return; }
+    this.col.onSnapshot(snap => {
+      if (!snap.metadata.fromCache) { clearTimeout(timer); this.setLabel('Synced to your account'); }
+      const rides = [];
+      snap.docs.forEach(d => { try { rides.push(makeRide(d.data())); } catch {} });
+      Store.rides = rides; Store.save();
+      this.ready = true;
+      render();
+    }, () => { clearTimeout(timer); this.col = null; this.setLabel('Sync stopped · saved on this device'); });
+  },
+  async put(list) {
+    if (!this.col) return;
+    for (const r of list) {
+      try { await this.col.doc(r.id).set({ ...r }); }
+      catch (e) { toast(e?.code === 'quota_exceeded' ? 'Sync storage is full' : 'Could not sync, saved on this device'); return; }
+    }
+  },
+  async del(id) {
+    if (!this.col) return;
+    try { await this.col.doc(id).delete(); } catch { toast('Could not sync delete'); }
+  },
+};
+
+const Prefs = Object.assign({ range: 'season', metric: 'speed', period: 'week', goal: 500, theme: null, sortKey: 'date', sortDir: -1 },
+  (() => { try { return JSON.parse(localStorage.getItem(PREFS_KEY)) || {}; } catch { return {}; } })());
+const savePrefs = () => { try { localStorage.setItem(PREFS_KEY, JSON.stringify(Prefs)); } catch {} };
+
+/* ---------- sample data: 15 realistic entries relative to today ---------- */
+function SAMPLE() {
+  const d = n => { const t = new Date(); t.setDate(t.getDate() - n); return isoDate(t); };
+  return [
+    { date: d(118), name: 'Spring base miles',       type: 'training', distance: 62.4,  time: '2:21:10', power: 172, hr: 138, elevation: 540,  notes: 'Steady Z2, felt good.' },
+    { date: d(110), name: 'Tuesday club chaingang',  type: 'group',    distance: 48.0,  time: '1:31:40', power: 205, hr: 152, elevation: 310,  notes: 'Fast through-and-off.' },
+    { date: d(101), name: 'Riverside Crit',          type: 'race',     distance: 40.0,  time: '0:59:12', power: 238, hr: 168, elevation: 120,  position: 7,  notes: 'Missed the late break.' },
+    { date: d(94),  name: 'Hill repeats',            type: 'training', distance: 38.6,  time: '1:39:55', power: 196, hr: 149, elevation: 880,  notes: '6x5 min at threshold.' },
+    { date: d(86),  name: 'Gran Fondo Valley 140',   type: 'race',     distance: 141.2, time: '4:58:30', power: 191, hr: 146, elevation: 2240, position: 23, notes: 'Cramped on the last climb. Fuel more!' },
+    { date: d(77),  name: 'Recovery spin',           type: 'training', distance: 25.3,  time: '1:01:20', power: null, hr: 118, elevation: 90,  notes: 'Easy legs.' },
+    { date: d(69),  name: 'Saturday cafe ride',      type: 'group',    distance: 74.8,  time: '2:42:05', power: 178, hr: 136, elevation: 760,  notes: 'Great coffee stop.' },
+    { date: d(60),  name: 'Harbour 25 km TT',        type: 'race',     distance: 25.0,  time: '0:36:48', power: 262, hr: 171, elevation: 85,   position: 4,  notes: 'PB pacing, 4 s off the podium.' },
+    { date: d(52),  name: 'Long endurance day',      type: 'training', distance: 118.5, time: '4:15:40', power: 165, hr: 134, elevation: 1520, notes: 'Longest training ride this year.' },
+    { date: d(41),  name: 'Mountain Road Race',      type: 'race',     distance: 96.0,  time: '3:02:15', power: 224, hr: 163, elevation: 1680, position: 2,  notes: 'Second in the sprint from a group of 8!' },
+    { date: d(29),  name: 'Sweet spot intervals',    type: 'training', distance: 52.1,  time: '1:47:30', power: 210, hr: 150, elevation: 420,  notes: '3x15 min SST.' },
+    { date: d(21),  name: 'Thursday night worlds',   type: 'group',    distance: 44.5,  time: '1:19:50', power: 214, hr: 158, elevation: 260,  notes: 'Attacked twice, got caught.' },
+    { date: d(14),  name: 'Autumn Classic',          type: 'race',     distance: 72.0,  time: '1:58:40', power: 231, hr: 165, elevation: 940,  position: 1,  notes: 'First win! Solo from 3 km out.' },
+    { date: d(7),   name: 'Gravel explore',          type: 'training', distance: 57.9,  time: '2:31:15', power: 168, hr: 141, elevation: 980,  notes: 'Muddy, mixed surface.' },
+    { date: d(2),   name: 'Coffee & tempo',          type: 'training', distance: 41.2,  time: '1:22:30', power: 198, hr: 147, elevation: 350,  notes: '' },
+  ];
+}
+
+/* =================================================================
+   2. UTILITIES
+   ================================================================= */
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const isoDate = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const parseISO = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function parseDuration(s) {
+  if (s == null) return null;
+  s = String(s).trim();
+  if (!/^\d{1,3}(:\d{1,2}){0,2}$/.test(s)) return null;
+  const p = s.split(':').map(Number);
+  // "90" = 90 minutes, "1:30" = h:mm, "1:30:00" = h:mm:ss
+  if (p.length === 1) return p[0] * 60;
+  if (p.length === 2) return p[0] * 3600 + p[1] * 60;
+  return p[0] * 3600 + p[1] * 60 + p[2];
+}
+function fmtDuration(sec, withSec = true) {
+  sec = Math.round(sec);
+  const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60;
+  return withSec ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${h}h ${String(m).padStart(2, '0')}m`;
+}
+const fmtKm = (v, dp = 1) => v.toLocaleString(undefined, { minimumFractionDigits: dp, maximumFractionDigits: dp });
+const fmtDate = s => parseISO(s).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+const fmtShort = s => parseISO(s).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+const ordinal = n => n + (['th', 'st', 'nd', 'rd'][(n % 100 > 10 && n % 100 < 14) ? 0 : n % 10] || 'th');
+const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+/* =================================================================
+   3. CSV IMPORT / EXPORT
+   ================================================================= */
+const CSV_COLS = ['date', 'name', 'type', 'distance_km', 'moving_time', 'avg_power_w', 'avg_hr_bpm', 'elevation_m', 'position', 'notes', 'best_10k'];
+
+function toCSV(rides) {
+  const cell = v => {
+    v = v == null ? '' : String(v);
+    return /[",\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+  };
+  const rows = rides.slice().sort((a, b) => a.date.localeCompare(b.date)).map(r =>
+    [r.date, r.name, r.type, r.distance, fmtDuration(r.time), r.power, r.hr, r.elevation, r.position, r.notes, r.best10k ? fmtDuration(r.best10k) : ''].map(cell).join(','));
+  return [CSV_COLS.join(','), ...rows].join('\r\n');
+}
+
+/** RFC-4180-ish parser: handles quotes, escaped quotes, newlines in cells. */
+function parseCSV(text) {
+  const rows = []; let row = [], cur = '', q = false;
+  text = text.replace(/^﻿/, '');
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) {
+      if (c === '"' && text[i + 1] === '"') { cur += '"'; i++; }
+      else if (c === '"') q = false;
+      else cur += c;
+    } else if (c === '"') q = true;
+    else if (c === ',') { row.push(cur); cur = ''; }
+    else if (c === '\n' || c === '\r') {
+      if (c === '\r' && text[i + 1] === '\n') i++;
+      row.push(cur); rows.push(row); row = []; cur = '';
+    } else cur += c;
+  }
+  if (cur || row.length) { row.push(cur); rows.push(row); }
+  return rows.filter(r => r.some(c => c.trim() !== ''));
+}
+
+function importCSV(text) {
+  const rows = parseCSV(text);
+  if (rows.length < 2) throw new Error('CSV has no data rows');
+  const head = rows[0].map(h => h.trim().toLowerCase());
+  // accept a few common header aliases
+  const alias = { distance: 'distance_km', time: 'moving_time', power: 'avg_power_w', hr: 'avg_hr_bpm', heart_rate: 'avg_hr_bpm', elevation: 'elevation_m' };
+  const idx = {}; head.forEach((h, i) => idx[alias[h] || h] = i);
+  if (idx.date == null || idx.distance_km == null) throw new Error('CSV needs at least "date" and "distance_km" columns');
+  const get = (r, k) => idx[k] != null ? (r[idx[k]] ?? '').trim() : '';
+  const typeMap = v => { v = v.toLowerCase(); return v.startsWith('race') ? 'race' : v.startsWith('group') ? 'group' : 'training'; };
+
+  let added = 0, skipped = 0; const fresh = [];
+  const existing = new Set(Store.rides.map(r => `${r.date}|${r.name}|${r.distance}`));
+  rows.slice(1).forEach(r => {
+    try {
+      const ride = makeRide({
+        date: get(r, 'date'), name: get(r, 'name') || 'Imported ride', type: typeMap(get(r, 'type')),
+        distance: get(r, 'distance_km'), time: get(r, 'moving_time'), power: get(r, 'avg_power_w'),
+        hr: get(r, 'avg_hr_bpm'), elevation: get(r, 'elevation_m'), position: get(r, 'position'), notes: get(r, 'notes'), best10k: get(r, 'best_10k'),
+      });
+      const key = `${ride.date}|${ride.name}|${ride.distance}`;
+      if (existing.has(key)) { skipped++; return; }
+      existing.add(key); Store.rides.push(ride); fresh.push(ride); added++;
+    } catch { skipped++; }
+  });
+  Store.save(); Cloud.put(fresh);
+  return { added, skipped };
+}
+
+async function download(name, text) {
+  // Inside the claude.ai viewer, files go through the downloads capability
+  const dl = window.claude?.use ? await window.claude.use('downloads').catch(() => null) : null;
+  if (dl) {
+    try { await dl.save({ filename: name, data: text }); toast('Export saved'); }
+    catch (e) { if (e?.code !== 'declined') toast('Export unavailable here'); }
+    return;
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }));
+  a.download = name; document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 0);
+  toast('Exported ' + Store.rides.length + ' rides');
+}
+
+/* =================================================================
+   4. FORM
+   ================================================================= */
+const dlg = $('#dlg'), form = $('#rideForm');
+let editingId = null;
+
+function openForm(ride) {
+  editingId = ride ? ride.id : null;
+  form.reset();
+  $('#formTitle').textContent = ride ? 'Edit ride' : 'Add ride';
+  $('#formErr').textContent = '';
+  $$('.field').forEach(f => f.classList.remove('invalid'));
+  const f = form.elements;
+  if (ride) {
+    f.date.value = ride.date; f.name.value = ride.name; f.type.value = ride.type;
+    f.distance.value = ride.distance; f.time.value = fmtDuration(ride.time);
+    f.power.value = ride.power ?? ''; f.hr.value = ride.hr ?? ''; f.elevation.value = ride.elevation;
+    f.position.value = ride.position ?? ''; f.notes.value = ride.notes; f.best10k.value = ride.best10k ?? '';
+  } else {
+    f.date.value = isoDate(new Date());
+  }
+  togglePos();
+  dlg.showModal();
+  f.name.focus();
+}
+function togglePos() { $('#posField').classList.toggle('hidden', form.elements.type.value !== 'race'); }
+
+form.elements.type.addEventListener('change', togglePos);
+$('#btnCancel').onclick = () => dlg.close();
+dlg.addEventListener('close', () => { if (Live.saving) { Live.saving = false; Live.open(); } });
+form.addEventListener('submit', e => {
+  e.preventDefault();
+  const f = form.elements;
+  $$('.field').forEach(x => x.classList.remove('invalid'));
+  const bad = ['date', 'name', 'distance', 'time'].filter(k => !f[k].checkValidity() || !f[k].value.trim());
+  if (!parseDuration(f.time.value)) bad.push('time');
+  if (bad.length) {
+    bad.forEach(k => f[k].closest('.field').classList.add('invalid'));
+    $('#formErr').textContent = 'Please check the highlighted fields.';
+    return;
+  }
+  try {
+    const ride = makeRide({
+      id: editingId, date: f.date.value, name: f.name.value, type: f.type.value,
+      distance: f.distance.value, time: f.time.value, power: f.power.value, hr: f.hr.value,
+      elevation: f.elevation.value, position: f.position.value, notes: f.notes.value,
+      best10k: f.best10k.value ? +f.best10k.value : null,
+    });
+    Store.upsert(ride);
+    if (Live.saving) Live.clear();
+    dlg.close();
+    toast(editingId ? 'Ride updated' : 'Ride added');
+    render();
+  } catch (err) { $('#formErr').textContent = err.message; }
+});
+
+/* =================================================================
+   5. FILTERING
+   ================================================================= */
+function rangeBounds() {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  if (Prefs.range === '30') { const s = new Date(today); s.setDate(s.getDate() - 29); return [s, today, 'Last 30 days']; }
+  if (Prefs.range === 'season') { const s = new Date(today.getFullYear(), 0, 1); return [s, today, `${today.getFullYear()} season`]; }
+  return [null, null, 'All time'];
+}
+function ridesInRange() {
+  const [s] = rangeBounds();
+  return Store.rides.filter(r => !s || parseISO(r.date) >= s).sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/* =================================================================
+   6. SUMMARY TILES
+   ================================================================= */
+function renderTiles(rides) {
+  const totalKm = rides.reduce((a, r) => a + r.distance, 0);
+  const totalT = rides.reduce((a, r) => a + r.time, 0);
+  const races = rides.filter(r => r.type === 'race');
+  const placed = races.filter(r => r.position != null).sort((a, b) => a.position - b.position || b.date.localeCompare(a.date));
+  const best = placed[0];
+  const longest = rides.slice().sort((a, b) => b.distance - a.distance)[0];
+  const tile = (label, value, unit, hint) =>
+    `<div class="card tile"><div class="label">${label}</div><div class="value">${value}${unit ? `<small>${unit}</small>` : ''}</div><div class="hint">${hint}</div></div>`;
+  $('#tiles').innerHTML = [
+    tile('Total distance', fmtKm(totalKm, 0), 'km', `${rides.length} ride${rides.length === 1 ? '' : 's'}`),
+    tile('Ride time', fmtDuration(totalT, false), '', rides.length ? `${fmtKm(totalKm / (totalT / 3600))} km/h average` : '—'),
+    tile('Races', races.length, '', races.length ? `${placed.filter(r => r.position <= 3).length} podium${placed.filter(r => r.position <= 3).length === 1 ? '' : 's'}` : 'No races yet'),
+    tile('Best finish', best ? ordinal(best.position) : '—', '', best ? esc(best.name) : 'No placings yet'),
+    tile('Longest ride', longest ? fmtKm(longest.distance) : '—', longest ? 'km' : '', longest ? esc(longest.name) : '—'),
+  ].join('');
+}
+
+/* =================================================================
+   7. CHARTS
+   ================================================================= */
+let trendChart, volChart;
+const METRICS = {
+  speed: { label: 'Average speed', unit: 'km/h', sub: 'km/h per ride', color: '--accent', get: r => Metrics.speed(r), dp: 1 },
+  power: { label: 'Average power', unit: 'W',    sub: 'watts per ride (rides with a power meter)', color: '--power', get: r => r.power, dp: 0 },
+  hr:    { label: 'Average heart rate', unit: 'bpm', sub: 'bpm per ride (rides with HR data)', color: '--hr', get: r => r.hr, dp: 0 },
+};
+
+function baseOptions(yTitle) {
+  const text2 = cssVar('--text-2'), grid = cssVar('--grid');
+  return {
+    responsive: true, maintainAspectRatio: false,
+    animation: { duration: 500, easing: 'easeOutQuart' },
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: cssVar('--surface'), titleColor: cssVar('--text'), bodyColor: cssVar('--text-2'),
+        borderColor: cssVar('--border'), borderWidth: 1, padding: 10, cornerRadius: 8,
+        displayColors: false, titleFont: { weight: '600' },
+      },
+    },
+    scales: {
+      x: { grid: { display: false }, border: { color: grid }, ticks: { color: text2, maxRotation: 0, autoSkip: true, maxTicksLimit: 8 } },
+      y: { grid: { color: grid }, border: { display: false }, ticks: { color: text2, padding: 6 },
+           title: { display: true, text: yTitle, color: text2, font: { size: 12 } } },
+    },
+  };
+}
+
+function renderTrend(rides) {
+  const m = METRICS[Prefs.metric];
+  const pts = rides.filter(r => m.get(r) != null);
+  $('#trendTitle').textContent = m.label;
+  $('#trendSub').textContent = pts.length ? m.sub : 'No data for this metric in the selected range';
+  const color = cssVar(m.color);
+  const opts = baseOptions(m.unit);
+  opts.scales.x.title = { display: true, text: 'Ride date', color: cssVar('--text-2'), font: { size: 12 } };
+  opts.plugins.tooltip.callbacks = {
+    title: items => fmtDate(pts[items[0].dataIndex].date),
+    label: item => {
+      const r = pts[item.dataIndex];
+      return [`${r.name}`, `${m.label}: ${item.parsed.y.toFixed(m.dp)} ${m.unit}`, `${fmtKm(r.distance)} km · ${TYPES[r.type]}`];
+    },
+  };
+  const data = {
+    labels: pts.map(r => fmtShort(r.date)),
+    datasets: [{
+      data: pts.map(r => +m.get(r).toFixed(m.dp)),
+      borderColor: color, backgroundColor: color + '22', fill: true, cubicInterpolationMode: 'monotone',
+      borderWidth: 2, pointRadius: 4, pointHoverRadius: 7,
+      pointBackgroundColor: color, pointBorderColor: cssVar('--surface'), pointBorderWidth: 2,
+      // race points drawn as larger rotated squares so type is visible without color
+      pointStyle: pts.map(r => r.type === 'race' ? 'rectRot' : 'circle'),
+      pointHitRadius: 12,
+    }],
+  };
+  if (trendChart) trendChart.destroy();
+  trendChart = new Chart($('#trendChart'), { type: 'line', data, options: opts });
+}
+
+function weekStart(d) { const x = new Date(d); const dow = (x.getDay() + 6) % 7; x.setDate(x.getDate() - dow); x.setHours(0, 0, 0, 0); return x; }
+
+function renderVolume(rides) {
+  const byWeek = Prefs.period === 'week';
+  $('#volSub').textContent = byWeek ? 'km per week (Mon–Sun)' : 'km per month';
+  const buckets = new Map();
+  const [rs, re] = rangeBounds();
+  // build continuous buckets so empty weeks/months show as gaps, not missing
+  if (rides.length) {
+    let cur = byWeek ? weekStart(rs || parseISO(rides[0].date)) : new Date((rs || parseISO(rides[0].date)).getFullYear(), (rs || parseISO(rides[0].date)).getMonth(), 1);
+    const end = re || new Date();
+    while (cur <= end) {
+      buckets.set(isoDate(cur), { km: 0, n: 0, start: new Date(cur) });
+      byWeek ? cur.setDate(cur.getDate() + 7) : cur.setMonth(cur.getMonth() + 1);
+    }
+  }
+  rides.forEach(r => {
+    const d = parseISO(r.date);
+    const k = isoDate(byWeek ? weekStart(d) : new Date(d.getFullYear(), d.getMonth(), 1));
+    if (!buckets.has(k)) buckets.set(k, { km: 0, n: 0, start: byWeek ? weekStart(d) : new Date(d.getFullYear(), d.getMonth(), 1) });
+    const b = buckets.get(k); b.km += r.distance; b.n++;
+  });
+  const arr = [...buckets.values()].sort((a, b) => a.start - b.start);
+  const label = b => byWeek ? b.start.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
+                            : b.start.toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+  const opts = baseOptions('Distance (km)');
+  opts.scales.x.title = { display: true, text: byWeek ? 'Week starting' : 'Month', color: cssVar('--text-2'), font: { size: 12 } };
+  opts.scales.y.beginAtZero = true;
+  opts.plugins.tooltip.callbacks = {
+    title: items => {
+      const b = arr[items[0].dataIndex];
+      if (!byWeek) return b.start.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+      const e = new Date(b.start); e.setDate(e.getDate() + 6);
+      return `${fmtShort(isoDate(b.start))} – ${fmtShort(isoDate(e))}`;
+    },
+    label: item => { const b = arr[item.dataIndex]; return [`${fmtKm(b.km)} km`, `${b.n} ride${b.n === 1 ? '' : 's'}`]; },
+  };
+  const color = cssVar('--accent');
+  const data = {
+    labels: arr.map(label),
+    datasets: [{
+      data: arr.map(b => +b.km.toFixed(1)),
+      backgroundColor: color, hoverBackgroundColor: color,
+      borderRadius: { topLeft: 4, topRight: 4 }, borderSkipped: 'bottom',
+      maxBarThickness: 36, categoryPercentage: .85, barPercentage: .9,
+    }],
+  };
+  if (volChart) volChart.destroy();
+  volChart = new Chart($('#volChart'), { type: 'bar', data, options: opts });
+}
+
+/* =================================================================
+   8. GOAL TRACKER (always current calendar month)
+   ================================================================= */
+function renderGoal() {
+  const now = new Date();
+  const monthKey = isoDate(now).slice(0, 7);
+  const km = Store.rides.filter(r => r.date.startsWith(monthKey)).reduce((a, r) => a + r.distance, 0);
+  const goal = Math.max(1, +Prefs.goal || 500);
+  const pct = Math.min(100, km / goal * 100);
+  const daysIn = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const daysLeft = daysIn - now.getDate();
+  const left = Math.max(0, goal - km);
+  $('#goalInput').value = goal;
+  $('#goalMonth').textContent = now.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  $('#goalDone').innerHTML = `${fmtKm(km, 0)} <span class="sub" style="font-size:1rem">/ ${goal} km</span>`;
+  $('#goalLeft').textContent = left > 0 ? `${fmtKm(left, 0)} km to go · ${Math.round(pct)}%` : 'Goal reached 🎉';
+  const bar = $('#goalBar'); bar.classList.toggle('done', pct >= 100);
+  bar.setAttribute('aria-valuenow', Math.round(pct));
+  requestAnimationFrame(() => bar.firstElementChild.style.width = pct + '%');
+  const expected = goal * now.getDate() / daysIn;
+  $('#goalPace').textContent = left <= 0 ? `Finished with ${daysLeft} day${daysLeft === 1 ? '' : 's'} to spare.`
+    : daysLeft > 0 ? `Need ${fmtKm(left / daysLeft, 0)} km/day for the remaining ${daysLeft} days · ${km >= expected ? 'ahead of' : 'behind'} pace (${fmtKm(expected, 0)} km expected by today).`
+    : 'Last day of the month — one more ride?';
+}
+
+/* =================================================================
+   9. PERSONAL BESTS (always all-time)
+   ================================================================= */
+function renderPBs() {
+  const R = Store.rides;
+  const maxBy = (arr, f) => arr.reduce((b, r) => (f(r) != null && (b == null || f(r) > f(b))) ? r : b, null);
+  const fast = R.filter(r => Metrics.est10k(r) != null).reduce((b, r) => !b || Metrics.est10k(r) < Metrics.est10k(b) ? r : b, null);
+  const longest = maxBy(R, r => r.distance);
+  const climb = maxBy(R, r => r.elevation);
+  const finish = R.filter(r => r.position != null).sort((a, b) => a.position - b.position || b.date.localeCompare(a.date))[0];
+  const pb = (icon, label, value, r, extra = '') => `<div class="pb"><div class="label">${icon} ${label}</div>
+    <div class="value">${value}</div><div class="meta">${r ? `${esc(r.name)} · ${fmtDate(r.date)}${extra}` : 'No data yet'}</div></div>`;
+  $('#pbs').innerHTML = [
+    pb('⚡', 'Fastest 10 km', fast ? fmtDuration(Metrics.est10k(fast)).replace(/^0:/, '') : '—', fast, fast ? (fast.best10k ? ' · GPS split' : ` · est. from ${fmtKm(Metrics.speed(fast))} km/h avg`) : ''),
+    pb('🛣️', 'Longest ride', longest ? `${fmtKm(longest.distance)} km` : '—', longest),
+    pb('⛰️', 'Most climbing', climb ? `${climb.elevation.toLocaleString()} m` : '—', climb),
+    pb('🏆', 'Best finish', finish ? ordinal(finish.position) : '—', finish),
+  ].join('');
+}
+
+/* =================================================================
+   10. RESULTS TABLE
+   ================================================================= */
+const SORT_GET = {
+  date: r => r.date, name: r => r.name.toLowerCase(), type: r => r.type, distance: r => r.distance,
+  time: r => r.time, speed: r => Metrics.speed(r), power: r => r.power, hr: r => r.hr,
+  elevation: r => r.elevation, position: r => r.position,
+};
+
+function renderTable(rides) {
+  const t = $('#fType').value, p = +$('#fPos').value || null, from = $('#fFrom').value, to = $('#fTo').value;
+  const q = $('#fText').value.trim().toLowerCase();
+  let list = rides.filter(r =>
+    (!t || r.type === t) &&
+    (!p || (r.position != null && r.position <= p)) &&
+    (!from || r.date >= from) && (!to || r.date <= to) &&
+    (!q || (r.name + ' ' + r.notes).toLowerCase().includes(q)));
+  const g = SORT_GET[Prefs.sortKey], dir = Prefs.sortDir;
+  list.sort((a, b) => {
+    const A = g(a), B = g(b);
+    if (A == null && B == null) return 0;
+    if (A == null) return 1;            // nulls always last
+    if (B == null) return -1;
+    return (A < B ? -1 : A > B ? 1 : 0) * dir;
+  });
+  $$('th[data-key]').forEach(th => {
+    const on = th.dataset.key === Prefs.sortKey;
+    th.classList.toggle('sorted', on);
+    th.querySelector('.arrow').textContent = on ? (dir > 0 ? '↑' : '↓') : '↕';
+    th.setAttribute('aria-sort', on ? (dir > 0 ? 'ascending' : 'descending') : 'none');
+  });
+  $('#tableCount').textContent = `${list.length} of ${rides.length} rides in range`;
+  $('#tbody').innerHTML = list.length ? list.map(r => `
+    <tr>
+      <td>${fmtDate(r.date)}</td>
+      <td class="name">${esc(r.name)}${r.notes ? `<span class="note" title="${esc(r.notes)}">${esc(r.notes)}</span>` : ''}</td>
+      <td><span class="pill ${r.type === 'race' ? 'race' : ''}">${TYPES[r.type]}</span></td>
+      <td class="num">${fmtKm(r.distance)}</td>
+      <td class="num">${fmtDuration(r.time)}</td>
+      <td class="num">${fmtKm(Metrics.speed(r))}</td>
+      <td class="num">${r.power ?? '–'}</td>
+      <td class="num">${r.hr ?? '–'}</td>
+      <td class="num">${r.elevation.toLocaleString()}</td>
+      <td class="num">${r.position ? `<span class="pos ${r.position === 1 ? 'p1' : ''}">${ordinal(r.position)}</span>` : '–'}</td>
+      <td class="row-actions">
+        <button class="ghost" data-edit="${r.id}" aria-label="Edit ${esc(r.name)}">Edit</button>
+        <button class="ghost danger" data-del="${r.id}" aria-label="Delete ${esc(r.name)}">✕</button>
+      </td>
+    </tr>`).join('') : `<tr><td colspan="11" class="empty">No rides match these filters.</td></tr>`;
+}
+
+/* =================================================================
+   11. LIVE RIDE MODE — the phone as a bike computer
+   -----------------------------------------------------------------
+   Reads the phone's GPS (navigator.geolocation.watchPosition), keeps the
+   screen awake (Wake Lock API) and turns the fixes into distance, moving
+   time, speed, climbing and a real fastest-10 km split. State is saved to
+   localStorage every few seconds so a reload or crash doesn't lose the ride.
+   ================================================================= */
+const LIVE_KEY = 'ridelog.live.v1';
+const MIN_MOVING = 1.0;      // m/s (3.6 km/h): slower than this counts as stopped
+const MAX_ACCURACY = 35;     // m: ignore fixes worse than this
+const MAX_JUMP = 28;         // m/s (~100 km/h): faster = GPS glitch
+
+function haversine(a, b) {
+  const R = 6371000, rad = Math.PI / 180;
+  const dLat = (b.lat - a.lat) * rad, dLon = (b.lon - a.lon) * rad;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+/** Fastest time over `meters` from [cumulativeMeters, movingSeconds] samples. */
+function bestSplit(pts, meters) {
+  let best = null, i = 0;
+  for (let j = 0; j < pts.length; j++) {
+    while (i + 1 < j && pts[j][0] - pts[i + 1][0] >= meters) i++;
+    if (pts[j][0] - pts[i][0] >= meters) {
+      const t = (pts[j][1] - pts[i][1]) * meters / (pts[j][0] - pts[i][0]);   // scale overshoot back to exactly 10 km
+      if (t > 0 && (best == null || t < best)) best = t;
+    }
+  }
+  return best;
+}
+
+const Live = {
+  s: null, watchId: null, wake: null, timer: null, lastFixAt: 0, lastSave: 0, saving: false, error: null,
+
+  fresh() { return { startedAt: Date.now(), status: 'running', dist: 0, moving: 0, elev: 0, maxSpeed: 0, speed: 0, last: null, altSm: null, altBase: null, pts: [[0, 0]], lastPtDist: 0 }; },
+  persist(force) {
+    if (!this.s) return;
+    if (!force && Date.now() - this.lastSave < 4000) return;
+    this.lastSave = Date.now();
+    try { localStorage.setItem(LIVE_KEY, JSON.stringify(this.s)); } catch {}
+  },
+  restore() { try { const v = JSON.parse(localStorage.getItem(LIVE_KEY)); if (v && v.startedAt) { this.s = v; if (v.status === 'running') v.status = 'paused'; this.s.last = null; } } catch {} },
+  clear() { this.stopGPS(); this.s = null; this.saving = false; try { localStorage.removeItem(LIVE_KEY); } catch {} this.close(); syncRideBtn(); },
+
+  open() { $('#live').classList.remove('hidden'); document.body.style.overflow = 'hidden'; this.draw(); this.startTimer(); },
+  close() { $('#live').classList.add('hidden'); document.body.style.overflow = ''; if (!this.s || this.s.status !== 'running') this.stopTimer(); },
+
+  supportProblem() {
+    if (!('geolocation' in navigator)) return 'This browser has no GPS access.';
+    if (!window.isSecureContext) return 'GPS only works on a secure (https://) address. See the note on hosting this file.';
+    return null;
+  },
+
+  start() {
+    const p = this.supportProblem(); if (p) { this.showMsg(p); return; }
+    keepDataSafe();
+    this.s = this.fresh(); this.error = null; this.persist(true);
+    this.startGPS(); this.keepAwake(); this.draw(); syncRideBtn();
+  },
+  pause() { if (!this.s) return; this.s.status = 'paused'; this.s.last = null; this.s.speed = 0; this.persist(true); this.draw(); syncRideBtn(); },
+  resume() { if (!this.s) return; this.hideMsg(); this.s.status = 'running'; this.s.last = null; if (this.watchId == null) this.startGPS(); this.keepAwake(); this.draw(); syncRideBtn(); },
+  finish() {
+    if (!this.s) return;
+    if (this.s.status !== 'finished' && !confirm('Finish this ride?')) return;
+    this.s.status = 'finished'; this.persist(true); this.stopGPS(); this.releaseWake(); this.draw(); syncRideBtn();
+    if (this.s.dist < 100) { this.showMsg('Ride is under 100 m. Discard it, or keep riding next time before saving.', true); return; }
+    this.save();
+  },
+  save() {
+    const s = this.s, d = new Date(s.startedAt), h = d.getHours();
+    const part = h < 5 ? 'Night' : h < 12 ? 'Morning' : h < 17 ? 'Afternoon' : h < 21 ? 'Evening' : 'Night';
+    this.saving = true;
+    this.close();
+    openForm(null);
+    const f = form.elements;
+    f.date.value = isoDate(d); f.name.value = part + ' ride'; f.type.value = 'training';
+    f.distance.value = (s.dist / 1000).toFixed(2); f.time.value = fmtDuration(Math.max(1, s.moving));
+    f.elevation.value = Math.round(s.elev);
+    const b = bestSplit(s.pts, 10000); f.best10k.value = b ? Math.round(b) : '';
+    f.notes.value = `Recorded with phone GPS. Max ${(s.maxSpeed * 3.6).toFixed(1)} km/h.`;
+    togglePos();
+    $('#formTitle').textContent = 'Save recorded ride';
+  },
+  discard() { if (confirm('Discard this recorded ride?')) { this.clear(); toast('Ride discarded'); } },
+
+  startGPS() {
+    if (this.watchId != null) return;
+    this.setGPS('warn', 'Finding GPS…');
+    this.watchId = navigator.geolocation.watchPosition(p => this.onFix(p), e => this.onError(e),
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 });
+  },
+  stopGPS() { if (this.watchId != null) navigator.geolocation.clearWatch(this.watchId); this.watchId = null; this.setGPS('', 'GPS off'); },
+
+  onError(e) {
+    if (e.code === 1) {
+      this.stopGPS(); this.setGPS('bad', 'Location blocked');
+      this.showMsg('Location access is blocked. If you opened this inside claude.ai, GPS isn’t available there. Open the standalone copy of this file in your phone’s browser instead. Otherwise allow location for this site in your browser settings.');
+    } else this.setGPS('warn', e.code === 3 ? 'Waiting for GPS…' : 'GPS signal lost');
+  },
+
+  onFix(pos) {
+    const s = this.s; if (!s) return;
+    const c = pos.coords, t = pos.timestamp || Date.now();
+    this.lastFixAt = Date.now(); this.hideMsg();
+    this.setGPS(c.accuracy <= 15 ? 'ok' : c.accuracy <= MAX_ACCURACY ? 'warn' : 'bad', `GPS ±${Math.round(c.accuracy)} m`);
+    if (s.status !== 'running' || c.accuracy > MAX_ACCURACY) return;
+    const here = { lat: c.latitude, lon: c.longitude, t };
+
+    // climbing: smooth noisy GPS altitude, count rises of 3 m+ (hysteresis)
+    if (c.altitude != null && (c.altitudeAccuracy == null || c.altitudeAccuracy <= 25)) {
+      s.altSm = s.altSm == null ? c.altitude : s.altSm + 0.25 * (c.altitude - s.altSm);
+      if (s.altBase == null || s.altSm < s.altBase) s.altBase = s.altSm;
+      else if (s.altSm - s.altBase >= 3) { s.elev += s.altSm - s.altBase; s.altBase = s.altSm; }
+    }
+    if (!s.last) { s.last = here; return; }
+    const dt = (t - s.last.t) / 1000; if (dt <= 0) return;
+    const d = haversine(s.last, here), vGps = d / dt;
+    if (vGps > MAX_JUMP) { s.last = here; return; }                      // glitch: re-anchor, don't count
+    const v = (c.speed != null && c.speed >= 0) ? c.speed : vGps;
+    if (v < MIN_MOVING || d < Math.min(3, c.accuracy * 0.3)) {            // stopped / jitter
+      s.speed = 0; s.last.t = t; this.draw(); this.persist(); return;
+    }
+    s.dist += d;
+    if (dt <= 15) s.moving += dt;                                          // ignore long signal gaps
+    s.speed = s.speed ? 0.6 * v + 0.4 * s.speed : v;
+    s.maxSpeed = Math.max(s.maxSpeed, s.speed);
+    if (s.dist - s.lastPtDist >= 20) { s.pts.push([Math.round(s.dist), Math.round(s.moving)]); s.lastPtDist = s.dist; }
+    s.last = here;
+    this.draw(); this.persist();
+  },
+
+  async keepAwake() {
+    if (!('wakeLock' in navigator)) { $('#wakeText').textContent = '· keep screen on manually'; return; }
+    try {
+      this.wake = await navigator.wakeLock.request('screen');
+      $('#wakeText').textContent = '· screen stays on';
+      this.wake.addEventListener('release', () => { this.wake = null; });
+    } catch { $('#wakeText').textContent = '· keep screen on manually'; }
+  },
+  releaseWake() { try { this.wake?.release(); } catch {} this.wake = null; $('#wakeText').textContent = ''; },
+
+  startTimer() { if (!this.timer) this.timer = setInterval(() => this.draw(), 1000); },
+  stopTimer() { clearInterval(this.timer); this.timer = null; },
+
+  setGPS(cls, text) { $('#gpsDot').className = 'dot ' + cls; $('#gpsText').textContent = text; },
+  showMsg(t, info) { const m = $('#liveMsg'); m.textContent = t; m.classList.toggle('info', !!info); m.classList.remove('hidden'); },
+  hideMsg() { $('#liveMsg').classList.add('hidden'); },
+
+  draw() {
+    const s = this.s || this.fresh();
+    if (this.s && this.s.status === 'running' && Date.now() - this.lastFixAt > 6000) this.s.speed = 0;
+    const set = (id, v, u) => { const el = $(id); el.textContent = v; if (u) { const sm = document.createElement('small'); sm.textContent = u; el.appendChild(sm); } };
+    set('#lvSpeed', (s.speed * 3.6).toFixed(1));
+    set('#lvDist', (s.dist / 1000).toFixed(2), 'km');
+    set('#lvTime', fmtDuration(s.moving));
+    set('#lvAvg', s.moving > 0 ? (s.dist / s.moving * 3.6).toFixed(1) : '0.0', 'km/h');
+    set('#lvElev', Math.round(s.elev), 'm');
+    set('#lvMax', (s.maxSpeed * 3.6).toFixed(1), 'km/h');
+    set('#lvClock', new Date().toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }));
+    const st = this.s ? this.s.status : 'idle';
+    if (st === 'paused' && this.watchId == null) this.setGPS('', 'Paused');
+    if (this.s && st !== 'finished') $('#gpsDot').classList.toggle('rec', st === 'running' && this.watchId != null && $('#gpsDot').classList.contains('ok'));
+    const btns = {
+      idle: [['go wide', '▶ Start ride', 'start']],
+      running: [['', '❚❚ Pause', 'pause'], ['danger', '■ Finish', 'finish']],
+      paused: [['go', '▶ Resume', 'resume'], ['danger', '■ Finish', 'finish']],
+      finished: [['primary', 'Save ride', 'save'], ['danger', 'Discard', 'discard']],
+    }[st];
+    const key = st;
+    const box = $('#liveActions');
+    if (box.dataset.state !== key) {
+      box.dataset.state = key;
+      box.innerHTML = btns.map(([cls, label, act]) => `<button class="${cls}" data-live="${act}">${label}</button>`).join('');
+    }
+  },
+};
+
+function syncRideBtn() {
+  const b = $('#btnRide'), on = Live.s && Live.s.status !== 'finished';
+  b.classList.toggle('rec', !!on); b.classList.toggle('go', !on);
+  b.textContent = !Live.s ? '▶ Ride' : Live.s.status === 'running' ? '● Recording' : Live.s.status === 'paused' ? '❚❚ Paused' : '● Unsaved ride';
+}
+$('#btnRide').onclick = () => Live.open();
+$('#liveClose').onclick = () => Live.close();
+$('#liveActions').onclick = e => { const b = e.target.closest('[data-live]'); if (b) Live[b.dataset.live](); };
+addEventListener('pagehide', () => Live.persist(true));
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') Live.persist(true);
+  if (document.visibilityState === 'visible' && Live.s && Live.s.status === 'running' && !Live.wake) Live.keepAwake();
+});
+
+/* =================================================================
+   12. RENDER + EVENTS
+   ================================================================= */
+function syncSeg(id, attr, val) { $$(`#${id} button`).forEach(b => b.classList.toggle('on', b.dataset[attr] === val)); }
+
+function render() {
+  const rides = ridesInRange();
+  const [, , label] = rangeBounds();
+  $('#rangeLabel').textContent = `${label} · ${rides.length} rides · personal bests & goal use all data`;
+  syncSeg('rangeSeg', 'range', Prefs.range);
+  syncSeg('metricSeg', 'metric', Prefs.metric);
+  syncSeg('periodSeg', 'period', Prefs.period);
+  renderTiles(rides);
+  renderTrend(rides);
+  renderVolume(rides);
+  renderGoal();
+  renderPBs();
+  renderTable(rides);
+}
+
+$('#rangeSeg').onclick = e => { const b = e.target.closest('button'); if (b) { Prefs.range = b.dataset.range; savePrefs(); render(); } };
+$('#metricSeg').onclick = e => { const b = e.target.closest('button'); if (b) { Prefs.metric = b.dataset.metric; savePrefs(); syncSeg('metricSeg', 'metric', Prefs.metric); renderTrend(ridesInRange()); } };
+$('#periodSeg').onclick = e => { const b = e.target.closest('button'); if (b) { Prefs.period = b.dataset.period; savePrefs(); syncSeg('periodSeg', 'period', Prefs.period); renderVolume(ridesInRange()); } };
+
+$('#goalInput').addEventListener('change', e => { const v = Math.round(+e.target.value); if (v > 0) { Prefs.goal = v; savePrefs(); } renderGoal(); });
+
+['#fType', '#fPos', '#fFrom', '#fTo', '#fText'].forEach(s => $(s).addEventListener('input', () => renderTable(ridesInRange())));
+$('#fReset').onclick = () => { ['#fType', '#fPos', '#fFrom', '#fTo', '#fText'].forEach(s => $(s).value = ''); renderTable(ridesInRange()); };
+
+$$('th[data-key]').forEach(th => th.addEventListener('click', () => {
+  const k = th.dataset.key;
+  if (Prefs.sortKey === k) Prefs.sortDir *= -1;
+  else { Prefs.sortKey = k; Prefs.sortDir = (k === 'name' || k === 'type' || k === 'position') ? 1 : -1; }
+  savePrefs(); renderTable(ridesInRange());
+}));
+
+$('#tbody').addEventListener('click', e => {
+  const ed = e.target.closest('[data-edit]'), del = e.target.closest('[data-del]');
+  if (ed) openForm(Store.rides.find(r => r.id === ed.dataset.edit));
+  if (del) {
+    const r = Store.rides.find(x => x.id === del.dataset.del);
+    if (r && confirm(`Delete "${r.name}" (${fmtDate(r.date)})?`)) { Store.remove(r.id); toast('Ride deleted'); render(); }
+  }
+});
+
+$('#btnAdd').onclick = () => openForm(null);
+$('#btnExport').onclick = () => download(`rides-${isoDate(new Date())}.csv`, toCSV(Store.rides));
+$('#btnImport').onclick = () => $('#fileInput').click();
+$('#fileInput').onchange = async e => {
+  const file = e.target.files[0]; if (!file) return;
+  try { const { added, skipped } = importCSV(await file.text()); toast(`Imported ${added} ride${added === 1 ? '' : 's'}${skipped ? `, skipped ${skipped}` : ''}`); render(); }
+  catch (err) { toast('Import failed: ' + err.message); }
+  e.target.value = '';
+};
+
+/* theme */
+function applyTheme() {
+  if (Prefs.theme) document.documentElement.dataset.theme = Prefs.theme;
+  else delete document.documentElement.dataset.theme;
+  const dark = Prefs.theme ? Prefs.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  $('#btnTheme').textContent = dark ? '☀️' : '🌙';
+}
+$('#btnTheme').onclick = () => {
+  const dark = Prefs.theme ? Prefs.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  Prefs.theme = dark ? 'light' : 'dark'; savePrefs(); applyTheme(); render();
+};
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (!Prefs.theme) { applyTheme(); render(); } });
+
+/* keyboard shortcut: "n" opens new-ride form */
+document.addEventListener('keydown', e => {
+  if (e.key === 'n' && !dlg.open && $('#live').classList.contains('hidden') && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) { e.preventDefault(); openForm(null); }
+});
+
+/* =================================================================
+   13. INSTALLABLE APP (PWA)
+   Offline cache via sw.js, an Install button where the browser supports
+   it, and instructions for iPhone, where installing is manual.
+   ================================================================= */
+const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+let installEvt = null;
+if ('serviceWorker' in navigator && window.top === window && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+  addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(e => console.warn('Offline cache unavailable', e)));
+}
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; $('#btnInstall').classList.remove('hidden'); });
+addEventListener('appinstalled', () => { installEvt = null; $('#btnInstall').classList.add('hidden'); toast('Ride Log installed'); });
+if (isIOS && !standalone && window.top === window && location.protocol === 'https:') $('#btnInstall').classList.remove('hidden');
+$('#btnInstall').onclick = async () => {
+  if (installEvt) { installEvt.prompt(); await installEvt.userChoice.catch(() => {}); installEvt = null; $('#btnInstall').classList.add('hidden'); }
+  else alert('To install on iPhone/iPad:\n\n1. Tap the Share button (square with an arrow) in Safari\n2. Choose "Add to Home Screen"\n3. Tap Add\n\nRide Log then opens full-screen from your home screen.');
+};
+/** Ask the browser not to clear our saved rides when the phone is low on space. */
+function keepDataSafe() { try { navigator.storage?.persist?.(); } catch {} }
+
+/* boot */
+if (typeof Chart === 'undefined') {
+  document.querySelectorAll('.chart-box').forEach(b => b.innerHTML = '<p class="empty">Charts need an internet connection to load Chart.js.</p>');
+  window.Chart = function () { return { destroy() {} }; };
+} else {
+  Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+}
+Store.load();
+applyTheme();
+render();
+Live.restore();
+if (!Live.s && new URLSearchParams(location.search).has('ride')) Live.open();
+if (Live.s) { syncRideBtn(); Live.open(); if (Live.s.status === 'paused') Live.showMsg('A ride was still in progress. Resume it or finish to save it.', true); }
+Cloud.init().catch(() => Cloud.setLabel('Saved on this device'));
+</script>
+</body>
+</html>
