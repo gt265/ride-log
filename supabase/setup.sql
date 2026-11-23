@@ -31,6 +31,12 @@ drop trigger if exists rides_stamp_synced_at on public.rides;
 create trigger rides_stamp_synced_at before insert or update on public.rides
   for each row execute function public.ridelog_stamp_synced_at();
 
+-- Let signed-in users use the tables through the app's API (newer Supabase projects
+-- don't grant this automatically). Signed-out visitors get no access at all.
+grant usage on schema public to authenticated;
+grant select, insert, update, delete on table public.rides    to authenticated;
+grant select, insert, update, delete on table public.profiles to authenticated;
+
 -- Row-level security: every rider can only ever see and change their own rows.
 alter table public.rides    enable row level security;
 alter table public.profiles enable row level security;
