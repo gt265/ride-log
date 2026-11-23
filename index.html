@@ -358,27 +358,72 @@ dialog h2 { margin: 0 0 16px; font-size: 1.15rem; }
 /* ---------- live ride mode ---------- */
 .live {
   position: fixed; inset: 0; z-index: 50; background: var(--bg); color: var(--text);
-  display: flex; flex-direction: column; padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+  display: flex; flex-direction: column; gap: 10px; padding: max(12px, env(safe-area-inset-top)) 14px max(14px, env(safe-area-inset-bottom));
   overflow-y: auto;
 }
-.live-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-.live-status { font-size: .85rem; color: var(--text-2); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.live-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.live-top .seg button { padding: 6px 14px; }
+.live-status { font-size: .8rem; color: var(--text-2); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; flex: 1; min-width: 0; }
 .live .dot { width: 10px; height: 10px; }
 .dot.rec { background: var(--danger); animation: blink 1.2s infinite; }
-.live-main { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 14px; max-width: 640px; width: 100%; margin: 0 auto; padding: 12px 0; }
+.live-banner { text-align: center; font-weight: 650; font-size: .9rem; padding: 8px 12px; border-radius: 12px; background: var(--surface-2); color: var(--text-2); }
+.live-banner.auto { background: rgba(201,133,0,.14); color: var(--warn); }
+.live-flash { text-align: center; font-weight: 650; padding: 10px 12px; border-radius: 12px; background: var(--accent-soft); color: var(--accent-ink); font-variant-numeric: tabular-nums; }
+.live-main { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 12px; max-width: 680px; width: 100%; margin: 0 auto; }
 .live-speed { text-align: center; }
-.live-speed .v { font-size: clamp(5rem, 28vw, 9rem); font-weight: 700; line-height: 1; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
-.live-speed .u { color: var(--text-2); font-size: 1.1rem; }
+.live-speed .v { font-size: clamp(5rem, 27vw, 9.5rem); font-weight: 750; line-height: .95; letter-spacing: -.045em; font-variant-numeric: tabular-nums; }
+.live-speed .u { color: var(--text-2); font-size: 1.05rem; font-weight: 550; }
 .live-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.live-cell { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 12px 14px; }
-.live-cell .l { font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; color: var(--text-2); }
-.live-cell .v { font-size: clamp(1.6rem, 8vw, 2.4rem); font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
-.live-cell .v small { font-size: .9rem; color: var(--text-2); font-weight: 500; margin-left: 3px; }
+.live-cell { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 10px 14px; border-left-width: 5px; }
+.live-cell .l { font-size: .74rem; text-transform: uppercase; letter-spacing: .05em; color: var(--text-2); font-weight: 600; }
+.live-cell .v { font-size: clamp(1.75rem, 9vw, 2.6rem); font-weight: 750; font-variant-numeric: tabular-nums; letter-spacing: -.03em; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.live-cell .v small { font-size: .85rem; color: var(--text-2); font-weight: 550; margin-left: 4px; letter-spacing: 0; }
+/* zone colours: a cool-to-hot sequence on the box edge, text stays in ink */
+.live-cell[data-zone="1"] { border-left-color: #8a8980; } .live-cell[data-zone="2"] { border-left-color: #2a78d6; }
+.live-cell[data-zone="3"] { border-left-color: #1baf7a; } .live-cell[data-zone="4"] { border-left-color: #eda100; }
+.live-cell[data-zone="5"] { border-left-color: #eb6834; } .live-cell[data-zone="6"], .live-cell[data-zone="7"] { border-left-color: #e34948; }
 .live-msg { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--danger); border-radius: 12px; padding: 12px 14px; font-size: .9rem; }
 .live-msg.info { border-left-color: var(--accent); }
-.live-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; max-width: 640px; width: 100%; margin: 0 auto; }
-.live-actions button { font-size: 1.15rem; font-weight: 650; min-height: 64px; border-radius: 18px; }
-.live-actions button.wide { grid-column: 1 / -1; }
+.live-mapwrap { flex: 1; position: relative; min-height: 260px; border-radius: 18px; overflow: hidden; border: 1px solid var(--border); }
+#liveMap { position: absolute; inset: 0; background: var(--surface-2); }
+.live-mapstats { position: absolute; left: 10px; right: 10px; bottom: 10px; z-index: 500; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 8px; box-shadow: var(--shadow); }
+.live-mapstats div { text-align: center; } .live-mapstats b { display: block; font-size: 1.5rem; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.live-mapstats span { font-size: .7rem; color: var(--text-3); text-transform: uppercase; letter-spacing: .05em; }
+.live-actions { display: grid; gap: 10px; max-width: 680px; width: 100%; margin: 0 auto; }
+.live-actions button { font-size: 1.15rem; font-weight: 650; min-height: 66px; border-radius: 18px; }
+@media (orientation: landscape) and (max-height: 560px) {
+  .live { padding-left: max(14px, env(safe-area-inset-left)); padding-right: max(14px, env(safe-area-inset-right)); }
+  .live-main { flex-direction: row; align-items: center; max-width: none; gap: 16px; }
+  .live-speed { flex: 0 0 34%; } .live-speed .v { font-size: clamp(4rem, 24vh, 8rem); }
+  .live-grid { flex: 1; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .live-cell .v { font-size: clamp(1.5rem, 9vh, 2.4rem); }
+  .live-actions { max-width: none; } .live-actions button { min-height: 50px; }
+}
+/* dark map tiles in dark mode */
+:root[data-theme="dark"] .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.85) contrast(.9); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.85) contrast(.9); } }
+.leaflet-container { font: inherit; background: var(--surface-2); }
+
+/* ride detail extras (map, laps) */
+.ride-extras { display: grid; gap: 12px; margin-bottom: 16px; }
+.ride-map { height: 220px; border-radius: 14px; overflow: hidden; border: 1px solid var(--border); position: relative; }
+.laps { width: 100%; font-size: .85rem; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; border-collapse: separate; border-spacing: 0; }
+.laps th, .laps td { padding: 7px 10px; cursor: default; }
+.laps tbody tr { cursor: default; }
+.extra-stats { display: flex; gap: 16px; flex-wrap: wrap; font-size: .85rem; color: var(--text-2); }
+.extra-stats b { color: var(--text); }
+
+/* switch */
+.switch { position: relative; width: 48px; height: 28px; flex: none; }
+.switch input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; z-index: 1; }
+.switch span { position: absolute; inset: 0; border-radius: 99px; background: var(--surface-3); transition: .2s; }
+.switch span::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: .2s; }
+.switch input:checked + span { background: var(--good); }
+.switch input:checked + span::after { transform: translateX(20px); }
+.switch input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.set-row select { width: auto; min-width: 140px; }
+#fieldPicks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 4px 0 6px; }
+@media (max-width: 520px) { #fieldPicks { grid-template-columns: 1fr 1fr; } }
 
 .toast {
   position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%) translateY(20px);
@@ -574,6 +619,24 @@ dialog h2 { margin: 0 0 16px; font-size: 1.15rem; }
       </div>
 
       <div class="card set-card">
+        <h2><svg class="i"><use href="#i-bike"/></svg>Ride screen</h2>
+        <p class="sub">Pick the six numbers shown under your speed while riding.</p>
+        <div id="fieldPicks"></div>
+        <button class="link-btn" id="fieldsReset">Reset to default</button>
+        <div class="set-row" style="margin-top:10px"><div><div class="t">Auto-pause</div><div class="d">Stop the clock when you stop (lights, cafés)</div></div><label class="switch"><input type="checkbox" id="autoPause" aria-label="Auto-pause"><span></span></label></div>
+        <div class="set-row"><div><div class="t">Auto-lap</div><div class="d">Start a new lap every…</div></div>
+          <select id="autoLap"><option value="0">Off</option><option value="1">1 km</option><option value="5">5 km</option><option value="10">10 km</option></select></div>
+        <div class="set-row"><div><div class="t">Voice updates</div><div class="d">Distance, time and average spoken aloud</div></div>
+          <select id="voiceEvery"><option value="0">Off</option><option value="1">Every 1 km</option><option value="5">Every 5 km</option><option value="10">Every 10 km</option></select></div>
+      </div>
+
+      <div class="card set-card">
+        <h2><svg class="i"><use href="#i-bolt"/></svg>Sensors</h2>
+        <p class="sub">Heart rate, power and cadence over Bluetooth. Zones use the max heart rate and FTP from your profile.</p>
+        <div id="sensorBody"></div>
+      </div>
+
+      <div class="card set-card">
         <h2><svg class="i"><use href="#i-db"/></svg>Your data</h2>
         <div class="set-row"><div><div class="t">Import rides</div><div class="d">Add rides from a CSV file</div></div><button id="btnImport">Import CSV</button></div>
         <div class="set-row"><div><div class="t">Export rides</div><div class="d">Download all rides as a CSV backup</div></div><button id="btnExport">Export CSV</button></div>
@@ -594,6 +657,7 @@ dialog h2 { margin: 0 0 16px; font-size: 1.15rem; }
 <dialog id="dlg">
   <form id="rideForm" novalidate>
     <h2 id="formTitle">Add ride</h2>
+    <div class="ride-extras hidden" id="rideExtras"></div>
     <div class="form-grid">
       <label class="field"><span>Date</span><input type="date" name="date" required></label>
       <label class="field"><span>Type</span>
@@ -607,7 +671,6 @@ dialog h2 { margin: 0 0 16px; font-size: 1.15rem; }
       <label class="field"><span>Elevation gain <em>(m)</em></span><input type="number" name="elevation" min="0" step="1" value="0" inputmode="numeric"></label>
       <label class="field" id="posField"><span>Finishing position</span><input type="number" name="position" min="1" step="1" inputmode="numeric"></label>
       <label class="field full"><span>Notes</span><textarea name="notes" maxlength="500" placeholder="How did it feel? Weather, tactics, kit…"></textarea></label>
-      <input type="hidden" name="best10k">
     </div>
     <div class="err" id="formErr"></div>
     <div class="form-actions">
@@ -622,21 +685,18 @@ dialog h2 { margin: 0 0 16px; font-size: 1.15rem; }
 <!-- live ride mode (phone as bike computer) -->
 <section class="live hidden" id="live" aria-label="Ride mode">
   <div class="live-top">
-    <div class="live-status"><span class="dot" id="gpsDot"></span><span id="gpsText">GPS off</span><span id="wakeText"></span></div>
-    <button class="ghost" id="liveClose">Dashboard</button>
+    <div class="live-status"><span class="dot" id="gpsDot"></span><span id="gpsText">GPS off</span><span id="wakeText"></span><span id="sensorText"></span></div>
+    <div class="seg" id="liveViewSeg" role="group" aria-label="Ride view"><button data-lview="stats">Stats</button><button data-lview="map">Map</button></div>
+    <button class="ghost sm" id="liveClose">Close</button>
   </div>
-  <div class="live-main">
-    <div class="live-msg hidden" id="liveMsg"></div>
+  <div class="live-banner hidden" id="liveBanner"></div>
+  <div class="live-flash hidden" id="liveFlash"></div>
+  <div class="live-msg hidden" id="liveMsg"></div>
+  <div class="live-main" id="liveStats">
     <div class="live-speed"><div class="v" id="lvSpeed">0.0</div><div class="u">km/h</div></div>
-    <div class="live-grid">
-      <div class="live-cell"><div class="l">Distance</div><div class="v" id="lvDist">0.00<small>km</small></div></div>
-      <div class="live-cell"><div class="l">Moving time</div><div class="v" id="lvTime">0:00:00</div></div>
-      <div class="live-cell"><div class="l">Avg speed</div><div class="v" id="lvAvg">0.0<small>km/h</small></div></div>
-      <div class="live-cell"><div class="l">Climbing</div><div class="v" id="lvElev">0<small>m</small></div></div>
-      <div class="live-cell"><div class="l">Max speed</div><div class="v" id="lvMax">0.0<small>km/h</small></div></div>
-      <div class="live-cell"><div class="l">Clock</div><div class="v" id="lvClock">--:--</div></div>
-    </div>
+    <div class="live-grid" id="liveGrid"></div>
   </div>
+  <div class="live-mapwrap hidden" id="liveMapWrap"><div id="liveMap"></div><div class="live-mapstats" id="liveMapStats"></div></div>
   <div class="live-actions" id="liveActions"></div>
 </section>
 
@@ -644,7 +704,7 @@ dialog h2 { margin: 0 0 16px; font-size: 1.15rem; }
 
 <script>
 'use strict';
-const APP_VERSION = '3.0';
+const APP_VERSION = '4.0';
 /* =================================================================
    1. DATA MODEL
    -----------------------------------------------------------------
@@ -664,6 +724,9 @@ const APP_VERSION = '3.0';
      position:  number|null  finishing place (races only)
      notes:     string
      best10k:   number|null  fastest 10 km split in seconds (GPS-recorded rides)
+     track:     string|null  route as an encoded polyline (GPS-recorded rides)
+     laps:      [{n, d: metres, t: seconds}]|null
+     cadence:   number|null  average rpm;  maxHr: number|null
      updatedAt: number   ms timestamp of the last edit (used for sync)
    }
    ================================================================= */
@@ -693,6 +756,10 @@ function makeRide(raw) {
     position: num(raw.position),
     notes: String(raw.notes || '').trim(),
     best10k: typeof raw.best10k === 'number' ? raw.best10k : (parseDuration(raw.best10k) || null),
+    track: typeof raw.track === 'string' && raw.track.length > 1 && raw.track.length < 300000 ? raw.track : null,
+    laps: Array.isArray(raw.laps) && raw.laps.length ? raw.laps.filter(l => l && +l.d >= 0 && +l.t >= 0).slice(0, 500).map((l, i) => ({ n: i + 1, d: Math.round(+l.d), t: Math.round(+l.t) })) : null,
+    cadence: num(raw.cadence),
+    maxHr: num(raw.maxHr),
     updatedAt: num(raw.updatedAt) || 0,
   };
   if (!/^\d{4}-\d{2}-\d{2}$/.test(r.date) || isNaN(new Date(r.date))) throw new Error('Invalid date');
@@ -1112,7 +1179,36 @@ const Cloud = {
    5. RIDE FORM
    ================================================================= */
 const dlg = $('#dlg'), form = $('#rideForm');
-let editingId = null;
+let editingId = null, formExtra = {}, rideMap = null;
+
+/** data that isn't a form field (route, laps, GPS split, sensor stats) travels with the form */
+function setFormExtra(x) {
+  formExtra = x || {};
+  if (rideMap) { rideMap.remove(); rideMap = null; }
+  const box = $('#rideExtras'), parts = [];
+  if (formExtra.track) parts.push('<div class="ride-map" id="rideMap"></div>');
+  const stats = [];
+  if (formExtra.best10k) stats.push(`Fastest 10 km <b>${fmtDuration(formExtra.best10k).replace(/^0:/, '')}</b>`);
+  if (formExtra.cadence) stats.push(`Avg cadence <b>${formExtra.cadence} rpm</b>`);
+  if (formExtra.maxHr) stats.push(`Max HR <b>${formExtra.maxHr} bpm</b>`);
+  if (stats.length) parts.push(`<div class="extra-stats">${stats.map(x => `<span>${x}</span>`).join('')}</div>`);
+  if (formExtra.laps && formExtra.laps.length) parts.push(`<table class="laps"><thead><tr><th>Lap</th><th class="num">Km</th><th class="num">Time</th><th class="num">Km/h</th></tr></thead><tbody>${
+    formExtra.laps.map(l => `<tr><td>${l.n}</td><td class="num">${(l.d / 1000).toFixed(2)}</td><td class="num">${fmtDuration(l.t)}</td><td class="num">${l.t ? (l.d / l.t * 3.6).toFixed(1) : '–'}</td></tr>`).join('')}</tbody></table>`);
+  box.innerHTML = parts.join(''); box.classList.toggle('hidden', !parts.length);
+  if (formExtra.track) {
+    const track = formExtra.track;
+    loadLeaflet().then(() => {
+      const el = $('#rideMap'); if (!el || formExtra.track !== track) return;
+      const pts = decodeTrack(track); if (pts.length < 2) return;
+      rideMap = makeMap(el);
+      const line = L.polyline(pts, { color: cssVar('--accent'), weight: 4 }).addTo(rideMap);
+      const dot = c => ({ radius: 7, color: '#fff', weight: 2, fillColor: cssVar(c), fillOpacity: 1 });
+      L.circleMarker(pts[0], dot('--good')).addTo(rideMap).bindTooltip('Start');
+      L.circleMarker(pts[pts.length - 1], dot('--danger')).addTo(rideMap).bindTooltip('Finish');
+      setTimeout(() => { rideMap.invalidateSize(); rideMap.fitBounds(line.getBounds(), { padding: [24, 24] }); }, 60);
+    }).catch(() => { const el = $('#rideMap'); if (el) el.innerHTML = '<div class="chart-empty">Map couldn\u2019t load. Check your connection.</div>'; });
+  }
+}
 
 function openForm(ride) {
   editingId = ride ? ride.id : null;
@@ -1126,10 +1222,11 @@ function openForm(ride) {
     f.date.value = ride.date; f.name.value = ride.name; f.type.value = ride.type;
     f.distance.value = ride.distance; f.time.value = fmtDuration(ride.time);
     f.power.value = ride.power ?? ''; f.hr.value = ride.hr ?? ''; f.elevation.value = ride.elevation;
-    f.position.value = ride.position ?? ''; f.notes.value = ride.notes; f.best10k.value = ride.best10k ?? '';
+    f.position.value = ride.position ?? ''; f.notes.value = ride.notes;
   } else {
     f.date.value = isoDate(new Date());
   }
+  setFormExtra(ride ? { best10k: ride.best10k, track: ride.track, laps: ride.laps, cadence: ride.cadence, maxHr: ride.maxHr } : {});
   togglePos();
   dlg.showModal();
   if (matchMedia('(min-width: 761px)').matches) f.name.focus();
@@ -1138,7 +1235,10 @@ function togglePos() { $('#posField').classList.toggle('hidden', form.elements.t
 
 form.elements.type.addEventListener('change', togglePos);
 $('#btnCancel').onclick = () => dlg.close();
-dlg.addEventListener('close', () => { if (Live.saving) { Live.saving = false; Live.open(); } });
+dlg.addEventListener('close', () => {
+  if (rideMap) { rideMap.remove(); rideMap = null; }
+  if (Live.saving) { Live.saving = false; Live.open(); }
+});
 $('#btnDelete').onclick = () => {
   const r = Store.rides.find(x => x.id === editingId);
   if (r && confirm(`Delete "${r.name}" (${fmtDate(r.date)})?`)) { Store.remove(r.id); dlg.close(); toast('Ride deleted'); render(); }
@@ -1159,7 +1259,8 @@ form.addEventListener('submit', e => {
       id: editingId, date: f.date.value, name: f.name.value, type: f.type.value,
       distance: f.distance.value, time: f.time.value, power: f.power.value, hr: f.hr.value,
       elevation: f.elevation.value, position: f.position.value, notes: f.notes.value,
-      best10k: f.best10k.value ? +f.best10k.value : null,
+      best10k: formExtra.best10k ?? null, track: formExtra.track ?? null, laps: formExtra.laps ?? null,
+      cadence: formExtra.cadence ?? null, maxHr: formExtra.maxHr ?? null,
     });
     Store.upsert(ride);
     if (Live.saving) Live.clear();
@@ -1387,7 +1488,7 @@ function posBadge(r) {
 }
 function rideCard(r) {
   return `<button class="ride-card" data-edit="${r.id}">
-    <div class="rc-top"><span class="pill ${r.type}">${TYPES[r.type]}</span><span>${fmtDate(r.date)}</span>${posBadge(r)}</div>
+    <div class="rc-top"><span class="pill ${r.type}">${TYPES[r.type]}</span>${r.track ? '<span class="pill">GPS</span>' : ''}<span>${fmtDate(r.date)}</span>${posBadge(r)}</div>
     <div class="rc-name">${esc(r.name)}</div>
     <div class="rc-stats">
       <div>${fmtKm(r.distance)}<span>km</span></div>
@@ -1628,7 +1729,7 @@ function route() {
   currentView = v;
   VIEWS.forEach(x => $('#view-' + x).classList.toggle('hidden', x !== v));
   $$('.tab[data-view]').forEach(t => { t.classList.toggle('on', t.dataset.view === v); t.setAttribute('aria-current', t.dataset.view === v ? 'page' : 'false'); });
-  if (v === 'settings') { fillProfileForm(); renderAccount(); }
+  if (v === 'settings') { fillProfileForm(); renderAccount(); renderSensors(); renderRideSettings(); }
   if (v === 'home') { trendChart?.resize(); volChart?.resize(); }
   if (changed) window.scrollTo(0, 0);
 }
@@ -1639,17 +1740,19 @@ $('#goalRing').onclick = () => { location.hash = '#settings'; setTimeout(() => $
 addEventListener('hashchange', route);
 
 /* =================================================================
-   11. LIVE RIDE MODE — the phone as a bike computer
+   11. BIKE COMPUTER: GPS recording, auto-pause, laps, sensors, map, voice
    -----------------------------------------------------------------
    Reads the phone's GPS (navigator.geolocation.watchPosition), keeps the
-   screen awake (Wake Lock API) and turns the fixes into distance, moving
-   time, speed, climbing and a real fastest-10 km split. State is saved to
-   localStorage every few seconds so a reload or crash doesn't lose the ride.
+   screen awake (Wake Lock API), optionally reads Bluetooth heart-rate /
+   power / cadence sensors (Web Bluetooth: Chrome on Android & computers),
+   and turns it all into a ride. State is saved to localStorage every few
+   seconds so a reload or crash doesn't lose the ride.
    ================================================================= */
 const LIVE_KEY = 'ridelog.live.v1';
 const MIN_MOVING = 1.0;      // m/s (3.6 km/h): slower than this counts as stopped
 const MAX_ACCURACY = 35;     // m: ignore fixes worse than this
 const MAX_JUMP = 28;         // m/s (~100 km/h): faster = GPS glitch
+const STOP_DELAY = 3;        // s stopped before the screen shows "Auto-paused"
 
 function haversine(a, b) {
   const R = 6371000, rad = Math.PI / 180;
@@ -1670,41 +1773,282 @@ function bestSplit(pts, meters) {
   return best;
 }
 
+/* ---------- compact route storage: simplify, then Google polyline encoding ---------- */
+function simplifyTrack(pts, tol = 4) {          // Douglas–Peucker, tolerance in metres
+  if (pts.length < 3) return pts.slice();
+  const kx = 111320 * Math.cos(pts[0][0] * Math.PI / 180), ky = 110540;
+  const xy = pts.map(p => [p[1] * kx, p[0] * ky]);
+  const keep = new Uint8Array(pts.length); keep[0] = keep[pts.length - 1] = 1;
+  const stack = [[0, pts.length - 1]];
+  while (stack.length) {
+    const [a, b] = stack.pop(); let maxD = 0, idx = -1;
+    const [ax, ay] = xy[a], [bx, by] = xy[b], dx = bx - ax, dy = by - ay, len2 = dx * dx + dy * dy;
+    for (let i = a + 1; i < b; i++) {
+      const [px, py] = xy[i];
+      const t = len2 ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / len2)) : 0;
+      const ex = ax + t * dx - px, ey = ay + t * dy - py, d = ex * ex + ey * ey;
+      if (d > maxD) { maxD = d; idx = i; }
+    }
+    if (maxD > tol * tol) { keep[idx] = 1; stack.push([a, idx], [idx, b]); }
+  }
+  return pts.filter((_, i) => keep[i]);
+}
+function encodeTrack(pts) {
+  const enc = v => { v = v < 0 ? ~(v << 1) : v << 1; let s = ''; while (v >= 0x20) { s += String.fromCharCode((0x20 | (v & 0x1f)) + 63); v >>= 5; } return s + String.fromCharCode(v + 63); };
+  let out = '', pa = 0, po = 0;
+  for (const [la, lo] of pts) { const a = Math.round(la * 1e5), o = Math.round(lo * 1e5); out += enc(a - pa) + enc(o - po); pa = a; po = o; }
+  return out;
+}
+function decodeTrack(str) {
+  const pts = []; let i = 0, la = 0, lo = 0;
+  const dec = () => { let r = 0, s = 0, b; do { b = str.charCodeAt(i++) - 63; r |= (b & 0x1f) << s; s += 5; } while (b >= 0x20 && i <= str.length); return r & 1 ? ~(r >> 1) : r >> 1; };
+  while (i < str.length) { la += dec(); lo += dec(); pts.push([la / 1e5, lo / 1e5]); }
+  return pts;
+}
+
+/* ---------- maps (Leaflet + OpenStreetMap, loaded only when needed) ---------- */
+let leafletLoading = null;
+function loadLeaflet() {
+  if (window.L) return Promise.resolve();
+  if (!leafletLoading) {
+    const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = 'vendor/leaflet/leaflet.css'; document.head.appendChild(css);
+    leafletLoading = loadScript('vendor/leaflet/leaflet.js').catch(e => { leafletLoading = null; throw e; });
+  }
+  return leafletLoading;
+}
+function makeMap(el) {
+  const map = L.map(el, { zoomControl: false, attributionControl: true });
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
+  map.attributionControl.setPrefix(false);
+  return map;
+}
+
+/* ---------- Bluetooth sensors (standard BLE profiles) ---------- */
+const SENSOR_DEFS = {
+  hr:    { service: 'heart_rate', char: 'heart_rate_measurement', label: 'Heart rate strap', short: 'HR' },
+  power: { service: 'cycling_power', char: 'cycling_power_measurement', label: 'Power meter', short: 'Power' },
+  cad:   { service: 'cycling_speed_and_cadence', char: 'csc_measurement', label: 'Cadence sensor', short: 'Cadence' },
+};
+const Sensors = {
+  supported: !!(navigator.bluetooth && navigator.bluetooth.requestDevice),
+  dev: {}, val: { hr: null, power: null, cadence: null }, at: { hr: 0, power: 0, cadence: 0 }, crank: {}, powerBuf: [],
+  unsupportedText() {
+    return /iPad|iPhone|iPod/.test(navigator.userAgent)
+      ? 'iPhone browsers can’t connect to Bluetooth sensors (Apple blocks it for web apps). This will work in the App Store version of Ride Log.'
+      : 'This browser can’t connect to Bluetooth sensors. Use Chrome on Android or on a computer.';
+  },
+  async connect(kind) {
+    if (!this.supported) throw new Error(this.unsupportedText());
+    const d = SENSOR_DEFS[kind];
+    const device = await navigator.bluetooth.requestDevice({ filters: [{ services: [d.service] }] });
+    if (this.dev[kind]) this.disconnect(kind);
+    const entry = { device, name: device.name || d.label, state: 'connecting' };
+    this.dev[kind] = entry; renderSensors();
+    device.addEventListener('gattserverdisconnected', () => this.onDrop(kind, entry));
+    try { await this.attach(kind, entry); } catch (e) { delete this.dev[kind]; renderSensors(); throw e; }
+  },
+  async attach(kind, entry) {
+    const d = SENSOR_DEFS[kind];
+    const server = await entry.device.gatt.connect();
+    const ch = await (await server.getPrimaryService(d.service)).getCharacteristic(d.char);
+    ch.addEventListener('characteristicvaluechanged', e => this.parse(kind, e.target.value));
+    await ch.startNotifications();
+    entry.state = 'on'; renderSensors();
+  },
+  async onDrop(kind, entry) {          // sensors drop out on bumpy roads: try to reconnect
+    if (this.dev[kind] !== entry || entry.state === 'off') return;
+    entry.state = 'reconnecting'; renderSensors();
+    for (let i = 0; i < 6 && this.dev[kind] === entry; i++) {
+      await new Promise(r => setTimeout(r, 1500 * (i + 1)));
+      try { await this.attach(kind, entry); return; } catch {}
+    }
+    if (this.dev[kind] === entry) { entry.state = 'lost'; renderSensors(); }
+  },
+  disconnect(kind) {
+    const e = this.dev[kind]; if (!e) return;
+    e.state = 'off'; delete this.dev[kind];
+    try { e.device.gatt.disconnect(); } catch {}
+    renderSensors();
+  },
+  parse(kind, v) {
+    const now = Date.now();
+    if (kind === 'hr') { const f = v.getUint8(0); this.set('hr', f & 1 ? v.getUint16(1, true) : v.getUint8(1), now); return; }
+    if (kind === 'power') {
+      const f = v.getUint16(0, true);
+      this.set('power', Math.max(0, v.getInt16(2, true)), now);
+      let o = 4; if (f & 1) o += 1; if (f & 4) o += 2; if (f & 16) o += 6;
+      if ((f & 32) && !this.dev.cad) this.crankData(v.getUint16(o, true), v.getUint16(o + 2, true), now);
+      return;
+    }
+    if (kind === 'cad') {
+      const f = v.getUint8(0); let o = 1; if (f & 1) o += 6;
+      if (f & 2) this.crankData(v.getUint16(o, true), v.getUint16(o + 2, true), now);
+    }
+  },
+  crankData(revs, time, now) {
+    const p = this.crank;
+    if (p.revs != null) {
+      const dr = (revs - p.revs) & 0xffff, dt = ((time - p.time) & 0xffff) / 1024;
+      if (dr > 0 && dt > 0 && dr < 20) { this.set('cadence', Math.round(dr / dt * 60), now); p.lastChange = now; }
+      else if (now - (p.lastChange || 0) > 3000) this.set('cadence', 0, now);
+    }
+    p.revs = revs; p.time = time;
+  },
+  set(k, x, now) {
+    this.val[k] = x; this.at[k] = now;
+    if (k === 'power') { this.powerBuf.push([now, x]); this.powerBuf = this.powerBuf.filter(e => now - e[0] <= 3000); }
+  },
+  /** latest value, or null if the sensor has gone quiet for 5 s */
+  get(k) { return Date.now() - this.at[k] < 5000 ? this.val[k] : null; },
+  power3s() {
+    const now = Date.now(), b = this.powerBuf.filter(e => now - e[0] <= 3000);
+    return b.length && now - this.at.power < 5000 ? Math.round(b.reduce((a, e) => a + e[1], 0) / b.length) : null;
+  },
+};
+
+/* ---------- training zones from the profile ---------- */
+const HR_ZONES = ['Recovery', 'Endurance', 'Tempo', 'Threshold', 'Max'];
+const PW_ZONES = ['Recovery', 'Endurance', 'Tempo', 'Threshold', 'VO2 max', 'Anaerobic', 'Sprint'];
+function hrZone(hr) {
+  const m = +Profile.data.maxHr; if (!hr || !m) return null;
+  const p = hr / m, z = p < .6 ? 1 : p < .7 ? 2 : p < .8 ? 3 : p < .9 ? 4 : 5;
+  return { z, name: HR_ZONES[z - 1] };
+}
+function powerZone(w) {
+  const f = +Profile.data.ftp; if (w == null || !f) return null;
+  const p = w / f, z = p < .56 ? 1 : p < .76 ? 2 : p < .91 ? 3 : p < 1.06 ? 4 : p < 1.21 ? 5 : p < 1.51 ? 6 : 7;
+  return { z, name: PW_ZONES[z - 1] };
+}
+
+/* ---------- the numbers you can put on the ride screen ---------- */
+const LIVE_FIELDS = {
+  distance:  ['Distance', s => [(s.dist / 1000).toFixed(2), 'km']],
+  moving:    ['Moving time', s => [fmtDuration(s.moving)]],
+  elapsed:   ['Elapsed time', () => [fmtDuration(Live.elapsed() / 1000)]],
+  avg:       ['Avg speed', s => [s.moving > 0 ? (s.dist / s.moving * 3.6).toFixed(1) : '0.0', 'km/h']],
+  max:       ['Max speed', s => [(s.maxSpeed * 3.6).toFixed(1), 'km/h']],
+  climb:     ['Climbing', s => [Math.round(s.elev), 'm']],
+  lapTime:   ['Lap time', s => [fmtDuration(s.moving - s.lapStart.t)]],
+  lapDist:   ['Lap distance', s => [((s.dist - s.lapStart.d) / 1000).toFixed(2), 'km']],
+  lastLap:   ['Last lap', s => { const l = s.laps[s.laps.length - 1]; return l ? [fmtDuration(l.t), `${(l.d / 1000).toFixed(2)} km`] : ['--']; }],
+  clock:     ['Clock', () => [new Date().toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })]],
+  hr:        ['Heart rate', () => [Sensors.get('hr') ?? '--', 'bpm']],
+  hrZone:    ['HR zone', () => { const z = hrZone(Sensors.get('hr')); return z ? ['Z' + z.z, z.name] : ['--', Profile.data.maxHr ? '' : 'set max HR']; }],
+  power:     ['Power (3s)', () => [Sensors.power3s() ?? '--', 'W']],
+  powerZone: ['Power zone', () => { const z = powerZone(Sensors.power3s()); return z ? ['Z' + z.z, z.name] : ['--', Profile.data.ftp ? '' : 'set FTP']; }],
+  avgPower:  ['Avg power', s => [s.pw.n ? Math.round(s.pw.sum / s.pw.n) : '--', 'W']],
+  cadence:   ['Cadence', () => [Sensors.get('cadence') ?? '--', 'rpm']],
+};
+const DEFAULT_FIELDS = Sensors.supported
+  ? ['distance', 'moving', 'avg', 'hr', 'power', 'cadence']
+  : ['distance', 'moving', 'avg', 'climb', 'lapTime', 'clock'];
+const liveFields = () => (Array.isArray(Prefs.liveFields) && Prefs.liveFields.length === 6 ? Prefs.liveFields : DEFAULT_FIELDS).map(k => LIVE_FIELDS[k] ? k : 'distance');
+const autoPauseOn = () => Prefs.autoPause !== false;
+
+/* ---------- voice ---------- */
+function speak(text) {
+  try {
+    if (!('speechSynthesis' in window)) return;
+    const u = new SpeechSynthesisUtterance(text); u.rate = 1.02;
+    speechSynthesis.cancel(); speechSynthesis.speak(u);
+  } catch {}
+}
+function spokenTime(sec) {
+  sec = Math.round(sec); const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60;
+  return [h && `${h} hour${h > 1 ? 's' : ''}`, m && `${m} minute${m > 1 ? 's' : ''}`, !h && s && `${s} seconds`].filter(Boolean).join(' ') || '0 seconds';
+}
+
 const Live = {
   s: null, watchId: null, wake: null, timer: null, lastFixAt: 0, lastSave: 0, saving: false, error: null,
+  map: null, mapLine: null, mapDot: null, flashTimer: null,
 
-  fresh() { return { startedAt: Date.now(), status: 'running', dist: 0, moving: 0, elev: 0, maxSpeed: 0, speed: 0, last: null, altSm: null, altBase: null, pts: [[0, 0]], lastPtDist: 0 }; },
+  fresh() {
+    const now = Date.now();
+    return { v: 2, startedAt: now, status: 'running', runningSince: now, elapsedBase: 0,
+      dist: 0, moving: 0, elev: 0, maxSpeed: 0, speed: 0, last: null, pos: null, altSm: null, altBase: null,
+      pts: [[0, 0]], lastPtDist: 0, track: [], stillSince: null, autoPaused: false,
+      laps: [], lapStart: { d: 0, t: 0 }, nextLap: 1, nextVoice: 1,
+      hr: { sum: 0, n: 0, max: 0 }, pw: { sum: 0, n: 0, max: 0 }, cad: { sum: 0, n: 0 } };
+  },
+  /** fill in fields missing from a ride started by an older version */
+  upgrade(v) { const f = this.fresh(); for (const k in f) if (v[k] === undefined) v[k] = f[k]; if (v.runningSince === undefined) v.runningSince = null; return v; },
+  elapsed() { const s = this.s; return !s ? 0 : s.elapsedBase + (s.status === 'running' && s.runningSince ? Date.now() - s.runningSince : 0); },
+
   persist(force) {
     if (!this.s) return;
     if (!force && Date.now() - this.lastSave < 4000) return;
-    this.lastSave = Date.now();
+    this.lastSave = Date.now(); this.s.savedAt = this.lastSave;
     try { localStorage.setItem(LIVE_KEY, JSON.stringify(this.s)); } catch {}
   },
-  restore() { try { const v = JSON.parse(localStorage.getItem(LIVE_KEY)); if (v && v.startedAt) { this.s = v; if (v.status === 'running') v.status = 'paused'; this.s.last = null; } } catch {} },
-  clear() { this.stopGPS(); this.s = null; this.saving = false; try { localStorage.removeItem(LIVE_KEY); } catch {} this.close(); syncRideBtn(); },
+  restore() {
+    try {
+      const v = JSON.parse(localStorage.getItem(LIVE_KEY));
+      if (!v || !v.startedAt) return;
+      this.s = this.upgrade(v);
+      if (v.status === 'running') {   // the app was closed mid-ride: count time up to the last save, then pause
+        v.elapsedBase += Math.max(0, (v.savedAt || Date.now()) - (v.runningSince || Date.now()));
+        v.status = 'paused'; v.runningSince = null;
+      }
+      v.last = null; v.speed = 0; v.autoPaused = false;
+    } catch {}
+  },
+  clear() { this.stopGPS(); this.releaseWake(); this.stopTimer(); this.s = null; this.saving = false; try { localStorage.removeItem(LIVE_KEY); } catch {} this.close(); syncRideBtn(); },
 
-  open() { $('#live').classList.remove('hidden'); document.body.style.overflow = 'hidden'; this.draw(); this.startTimer(); },
+  open() {
+    $('#live').classList.remove('hidden'); document.body.style.overflow = 'hidden';
+    this.hideMsg(); this.setView(Prefs.liveView || 'stats'); this.draw(); this.startTimer();
+    if (!this.s && !Sensors.supported) this.showMsg('Tip: mount your phone before tapping Start. The screen stays on while you ride.', true);
+  },
   close() { $('#live').classList.add('hidden'); document.body.style.overflow = ''; if (!this.s || this.s.status !== 'running') this.stopTimer(); },
 
   supportProblem() {
     if (!('geolocation' in navigator)) return 'This browser has no GPS access.';
-    if (!window.isSecureContext) return 'GPS only works on a secure (https://) address. See the note on hosting this file.';
+    if (!window.isSecureContext) return 'GPS only works on a secure (https://) address.';
     return null;
   },
 
   start() {
     const p = this.supportProblem(); if (p) { this.showMsg(p); return; }
-    keepDataSafe();
-    this.s = this.fresh(); this.error = null; this.persist(true);
-    this.startGPS(); this.keepAwake(); this.draw(); syncRideBtn();
+    keepDataSafe(); this.hideMsg();
+    this.s = this.fresh(); this.persist(true);
+    this.startGPS(); this.keepAwake(); this.startTimer();
+    if (Prefs.voice) speak('Ride started');          // also unlocks speech on iPhone (needs a tap)
+    this.draw(); syncRideBtn();
   },
-  pause() { if (!this.s) return; this.s.status = 'paused'; this.s.last = null; this.s.speed = 0; this.persist(true); this.draw(); syncRideBtn(); },
-  resume() { if (!this.s) return; this.hideMsg(); this.s.status = 'running'; this.s.last = null; if (this.watchId == null) this.startGPS(); this.keepAwake(); this.draw(); syncRideBtn(); },
+  pause() {
+    const s = this.s; if (!s || s.status !== 'running') return;
+    s.elapsedBase += Date.now() - (s.runningSince || Date.now()); s.runningSince = null;
+    s.status = 'paused'; s.last = null; s.speed = 0; s.autoPaused = false;
+    this.persist(true); this.draw(); syncRideBtn();
+  },
+  resume() {
+    const s = this.s; if (!s) return;
+    this.hideMsg(); s.status = 'running'; s.runningSince = Date.now(); s.last = null; s.stillSince = null;
+    if (this.watchId == null) this.startGPS();
+    this.keepAwake(); this.startTimer(); this.draw(); syncRideBtn();
+  },
+  lap(auto) {
+    const s = this.s; if (!s || s.status !== 'running') return;
+    const l = { n: s.laps.length + 1, d: Math.round(s.dist - s.lapStart.d), t: Math.round(s.moving - s.lapStart.t) };
+    if (!auto && l.d < 20 && l.t < 10) return;
+    s.laps.push(l); s.lapStart = { d: s.dist, t: s.moving };
+    const kmh = l.t ? (l.d / l.t * 3.6).toFixed(1) : '0.0';
+    this.flash(`Lap ${l.n} · ${(l.d / 1000).toFixed(2)} km · ${fmtDuration(l.t)} · ${kmh} km/h`);
+    if (Prefs.voice) speak(`Lap ${l.n}. ${spokenTime(l.t)}. ${kmh} kilometres per hour.`);
+    try { navigator.vibrate?.(200); } catch {}
+    this.persist(true); this.draw();
+  },
   finish() {
-    if (!this.s) return;
-    if (this.s.status !== 'finished' && !confirm('Finish this ride?')) return;
-    this.s.status = 'finished'; this.persist(true); this.stopGPS(); this.releaseWake(); this.draw(); syncRideBtn();
-    if (this.s.dist < 100) { this.showMsg('Ride is under 100 m. Discard it, or keep riding next time before saving.', true); return; }
+    const s = this.s; if (!s) return;
+    if (s.status !== 'finished' && !confirm('Finish this ride?')) return;
+    if (s.status === 'running') { s.elapsedBase += Date.now() - (s.runningSince || Date.now()); s.runningSince = null; }
+    if (s.laps.length && s.dist - s.lapStart.d > 50) {     // close the final lap
+      s.laps.push({ n: s.laps.length + 1, d: Math.round(s.dist - s.lapStart.d), t: Math.round(s.moving - s.lapStart.t) });
+      s.lapStart = { d: s.dist, t: s.moving };
+    }
+    s.status = 'finished'; this.persist(true); this.stopGPS(); this.releaseWake(); this.stopTimer(); this.draw(); syncRideBtn();
+    if (Prefs.voice) speak(`Ride finished. ${(s.dist / 1000).toFixed(1)} kilometres in ${spokenTime(s.moving)}.`);
+    if (s.dist < 100) { this.showMsg('Ride is under 100 m. Discard it, or save it anyway.', true); return; }
     this.save();
   },
   save() {
@@ -1717,8 +2061,20 @@ const Live = {
     f.date.value = isoDate(d); f.name.value = part + ' ride'; f.type.value = 'training';
     f.distance.value = (s.dist / 1000).toFixed(2); f.time.value = fmtDuration(Math.max(1, s.moving));
     f.elevation.value = Math.round(s.elev);
-    const b = bestSplit(s.pts, 10000); f.best10k.value = b ? Math.round(b) : '';
-    f.notes.value = `Recorded with phone GPS. Max ${(s.maxSpeed * 3.6).toFixed(1)} km/h.`;
+    if (s.pw.n) f.power.value = Math.round(s.pw.sum / s.pw.n);
+    if (s.hr.n) f.hr.value = Math.round(s.hr.sum / s.hr.n);
+    const b = bestSplit(s.pts, 10000);
+    const notes = [`Recorded with phone GPS. Max ${(s.maxSpeed * 3.6).toFixed(1)} km/h.`];
+    if (s.hr.max) notes.push(`Max HR ${s.hr.max}.`);
+    if (s.pw.max) notes.push(`Max power ${s.pw.max} W.`);
+    f.notes.value = notes.join(' ');
+    setFormExtra({
+      best10k: b ? Math.round(b) : null,
+      track: s.track.length > 1 ? encodeTrack(simplifyTrack(s.track)) : null,
+      laps: s.laps.length ? s.laps : null,
+      cadence: s.cad.n ? Math.round(s.cad.sum / s.cad.n) : null,
+      maxHr: s.hr.max || null,
+    });
     togglePos();
     $('#formTitle').textContent = 'Save recorded ride';
   },
@@ -1735,15 +2091,16 @@ const Live = {
   onError(e) {
     if (e.code === 1) {
       this.stopGPS(); this.setGPS('bad', 'Location blocked');
-      this.showMsg('Location access is blocked. If you opened this inside claude.ai, GPS isn’t available there. Open the standalone copy of this file in your phone’s browser instead. Otherwise allow location for this site in your browser settings.');
+      this.showMsg('Location access is blocked. Allow location for Ride Log: on iPhone, Settings → Privacy & Security → Location Services → Safari Websites (or Ride Log) → While Using. Inside claude.ai GPS isn’t available at all.');
     } else this.setGPS('warn', e.code === 3 ? 'Waiting for GPS…' : 'GPS signal lost');
   },
 
   onFix(pos) {
     const s = this.s; if (!s) return;
     const c = pos.coords, t = pos.timestamp || Date.now();
-    this.lastFixAt = Date.now(); this.hideMsg();
+    this.lastFixAt = Date.now();
     this.setGPS(c.accuracy <= 15 ? 'ok' : c.accuracy <= MAX_ACCURACY ? 'warn' : 'bad', `GPS ±${Math.round(c.accuracy)} m`);
+    if (c.accuracy <= MAX_ACCURACY) s.pos = [c.latitude, c.longitude];
     if (s.status !== 'running' || c.accuracy > MAX_ACCURACY) return;
     const here = { lat: c.latitude, lon: c.longitude, t };
 
@@ -1753,21 +2110,50 @@ const Live = {
       if (s.altBase == null || s.altSm < s.altBase) s.altBase = s.altSm;
       else if (s.altSm - s.altBase >= 3) { s.elev += s.altSm - s.altBase; s.altBase = s.altSm; }
     }
-    if (!s.last) { s.last = here; return; }
+    if (!s.last) { s.last = here; if (!s.track.length) s.track.push([+here.lat.toFixed(6), +here.lon.toFixed(6)]); this.updateMap(); return; }
     const dt = (t - s.last.t) / 1000; if (dt <= 0) return;
     const d = haversine(s.last, here), vGps = d / dt;
     if (vGps > MAX_JUMP) { s.last = here; return; }                      // glitch: re-anchor, don't count
     const v = (c.speed != null && c.speed >= 0) ? c.speed : vGps;
     if (v < MIN_MOVING || d < Math.min(3, c.accuracy * 0.3)) {            // stopped / jitter
-      s.speed = 0; s.last.t = t; this.draw(); this.persist(); return;
+      s.speed = 0;
+      if (s.stillSince == null) s.stillSince = t;
+      if (autoPauseOn()) { if ((t - s.stillSince) / 1000 >= STOP_DELAY && !s.autoPaused) { s.autoPaused = true; try { navigator.vibrate?.(80); } catch {} } }
+      else if (dt <= 15) s.moving += dt;                                  // auto-pause off: stops count as moving time
+      s.last.t = t; this.draw(); this.persist(); return;
     }
+    s.stillSince = null; s.autoPaused = false;
     s.dist += d;
     if (dt <= 15) s.moving += dt;                                          // ignore long signal gaps
     s.speed = s.speed ? 0.6 * v + 0.4 * s.speed : v;
     s.maxSpeed = Math.max(s.maxSpeed, s.speed);
     if (s.dist - s.lastPtDist >= 20) { s.pts.push([Math.round(s.dist), Math.round(s.moving)]); s.lastPtDist = s.dist; }
+    const lastT = s.track[s.track.length - 1];
+    if (!lastT || haversine({ lat: lastT[0], lon: lastT[1] }, here) >= 8) s.track.push([+here.lat.toFixed(6), +here.lon.toFixed(6)]);
     s.last = here;
+    if (+Prefs.autoLap && s.dist >= s.nextLap * Prefs.autoLap * 1000) { s.nextLap = Math.floor(s.dist / (Prefs.autoLap * 1000)) + 1; this.lap(true); }
+    if (+Prefs.voice && s.dist >= s.nextVoice * Prefs.voice * 1000) {
+      s.nextVoice = Math.floor(s.dist / (Prefs.voice * 1000)) + 1;
+      const km = Math.round(s.dist / 1000), avg = (s.dist / s.moving * 3.6).toFixed(1), hr = Sensors.get('hr');
+      speak(`${km} kilometre${km === 1 ? '' : 's'}. ${spokenTime(s.moving)}. Average ${avg} kilometres per hour.${hr ? ` Heart rate ${hr}.` : ''}`);
+    }
+    this.updateMap();
     this.draw(); this.persist();
+  },
+
+  /** once a second: sample sensors into the ride averages, refresh the screen */
+  tick() {
+    const s = this.s;
+    if (s && s.status === 'running') {
+      if (Date.now() - this.lastFixAt > 6000) s.speed = 0;
+      if (!s.autoPaused) {
+        const hr = Sensors.get('hr'), w = Sensors.get('power'), cad = Sensors.get('cadence');
+        if (hr) { s.hr.sum += hr; s.hr.n++; s.hr.max = Math.max(s.hr.max, hr); }
+        if (w != null) { s.pw.sum += w; s.pw.n++; s.pw.max = Math.max(s.pw.max, Sensors.power3s() || 0); }
+        if (cad) { s.cad.sum += cad; s.cad.n++; }
+      }
+    }
+    if (!$('#live').classList.contains('hidden')) this.draw();
   },
 
   async keepAwake() {
@@ -1780,41 +2166,134 @@ const Live = {
   },
   releaseWake() { try { this.wake?.release(); } catch {} this.wake = null; $('#wakeText').textContent = ''; },
 
-  startTimer() { if (!this.timer) this.timer = setInterval(() => this.draw(), 1000); },
+  startTimer() { if (!this.timer) this.timer = setInterval(() => this.tick(), 1000); },
   stopTimer() { clearInterval(this.timer); this.timer = null; },
 
   setGPS(cls, text) { $('#gpsDot').className = 'dot ' + cls; $('#gpsText').textContent = text; },
   showMsg(t, info) { const m = $('#liveMsg'); m.textContent = t; m.classList.toggle('info', !!info); m.classList.remove('hidden'); },
   hideMsg() { $('#liveMsg').classList.add('hidden'); },
+  flash(t) {
+    const b = $('#liveFlash'); b.textContent = t; b.classList.remove('hidden');
+    clearTimeout(this.flashTimer); this.flashTimer = setTimeout(() => b.classList.add('hidden'), 6000);
+  },
+
+  /* ----- map view ----- */
+  async setView(v) {
+    Prefs.liveView = v; savePrefs();
+    $$('#liveViewSeg button').forEach(b => b.classList.toggle('on', b.dataset.lview === v));
+    $('#liveStats').classList.toggle('hidden', v === 'map');
+    $('#liveMapWrap').classList.toggle('hidden', v !== 'map');
+    if (v !== 'map') return;
+    try { await loadLeaflet(); } catch { $('#liveMap').innerHTML = '<div class="chart-empty">Map couldn’t load. Check your connection.</div>'; return; }
+    if (!this.map) {
+      this.map = makeMap($('#liveMap'));
+      this.mapLine = L.polyline([], { color: cssVar('--accent'), weight: 5, opacity: .9 }).addTo(this.map);
+      this.mapDot = L.circleMarker([0, 0], { radius: 9, color: '#fff', weight: 3, fillColor: cssVar('--accent'), fillOpacity: 1 });
+      this.map.setView([51.5, 0], 3);
+    }
+    setTimeout(() => { this.map.invalidateSize(); this.updateMap(true); }, 50);
+  },
+  updateMap(full) {
+    if (!this.map || Prefs.liveView !== 'map' || $('#live').classList.contains('hidden')) return;
+    const s = this.s, track = s ? s.track : [];
+    if (full || !s) this.mapLine.setLatLngs(track);
+    else if (track.length) this.mapLine.addLatLng(track[track.length - 1]);
+    const pos = s?.pos || track[track.length - 1];
+    if (pos) {
+      if (!this.map.hasLayer(this.mapDot)) this.mapDot.addTo(this.map);
+      this.mapDot.setLatLng(pos);
+      this.map.setView(pos, Math.max(this.map.getZoom(), 16), { animate: !full });
+    }
+  },
 
   draw() {
     const s = this.s || this.fresh();
-    if (this.s && this.s.status === 'running' && Date.now() - this.lastFixAt > 6000) this.s.speed = 0;
-    const set = (id, v, u) => { const el = $(id); el.textContent = v; if (u) { const sm = document.createElement('small'); sm.textContent = u; el.appendChild(sm); } };
-    set('#lvSpeed', (s.speed * 3.6).toFixed(1));
-    set('#lvDist', (s.dist / 1000).toFixed(2), 'km');
-    set('#lvTime', fmtDuration(s.moving));
-    set('#lvAvg', s.moving > 0 ? (s.dist / s.moving * 3.6).toFixed(1) : '0.0', 'km/h');
-    set('#lvElev', Math.round(s.elev), 'm');
-    set('#lvMax', (s.maxSpeed * 3.6).toFixed(1), 'km/h');
-    set('#lvClock', new Date().toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }));
     const st = this.s ? this.s.status : 'idle';
-    if (st === 'paused' && this.watchId == null) this.setGPS('', 'Paused');
+    const speed = (st === 'running' ? s.speed : 0) * 3.6;
+    $('#lvSpeed').textContent = speed.toFixed(1);
+    // the six configurable fields
+    const grid = $('#liveGrid'), keys = liveFields();
+    if (grid.dataset.keys !== keys.join()) {
+      grid.dataset.keys = keys.join();
+      grid.innerHTML = keys.map(k => `<div class="live-cell" data-f="${k}"><div class="l">${LIVE_FIELDS[k][0]}</div><div class="v"></div></div>`).join('');
+    }
+    grid.querySelectorAll('.live-cell').forEach(cell => {
+      const [val, unit] = LIVE_FIELDS[cell.dataset.f][1](s);
+      const v = cell.querySelector('.v'); v.textContent = val;
+      if (unit) { const sm = document.createElement('small'); sm.textContent = unit; v.appendChild(sm); }
+      const z = cell.dataset.f === 'hrZone' ? hrZone(Sensors.get('hr')) : cell.dataset.f === 'powerZone' ? powerZone(Sensors.power3s()) : null;
+      cell.dataset.zone = z ? z.z : '';
+    });
+    $('#liveMapStats').innerHTML = `<div><b>${speed.toFixed(1)}</b><span>km/h</span></div><div><b>${(s.dist / 1000).toFixed(2)}</b><span>km</span></div><div><b>${fmtDuration(s.moving)}</b><span>moving</span></div>`;
+    // banner: paused states
+    const banner = $('#liveBanner');
+    const bannerText = st === 'paused' ? 'Paused' : st === 'running' && s.autoPaused ? 'Auto-paused · starts again when you ride' : st === 'finished' ? 'Ride finished' : '';
+    banner.textContent = bannerText; banner.classList.toggle('hidden', !bannerText);
+    banner.classList.toggle('auto', st === 'running' && s.autoPaused);
+    // sensors
+    const sens = Object.entries(Sensors.dev).map(([k, e]) => `${SENSOR_DEFS[k].short}${e.state === 'on' ? ' ✓' : e.state === 'lost' ? ' ✕' : ' …'}`);
+    $('#sensorText').textContent = sens.length ? '· ' + sens.join(' · ') : '';
     if (this.s && st !== 'finished') $('#gpsDot').classList.toggle('rec', st === 'running' && this.watchId != null && $('#gpsDot').classList.contains('ok'));
+    // buttons
     const btns = {
-      idle: [['go wide', '▶ Start ride', 'start']],
-      running: [['', '❚❚ Pause', 'pause'], ['danger', '■ Finish', 'finish']],
-      paused: [['go', '▶ Resume', 'resume'], ['danger', '■ Finish', 'finish']],
+      idle: [['go', `${icon('play')} Start ride`, 'start']],
+      running: [['', 'Lap', 'lap'], ['', '❚❚ Pause', 'pause'], ['danger', '■ Finish', 'finish']],
+      paused: [['go', `${icon('play')} Resume`, 'resume'], ['danger', '■ Finish', 'finish']],
       finished: [['primary', 'Save ride', 'save'], ['danger', 'Discard', 'discard']],
     }[st];
-    const key = st;
     const box = $('#liveActions');
-    if (box.dataset.state !== key) {
-      box.dataset.state = key;
+    if (box.dataset.state !== st) {
+      box.dataset.state = st;
+      box.style.gridTemplateColumns = `repeat(${btns.length}, minmax(0, 1fr))`;
       box.innerHTML = btns.map(([cls, label, act]) => `<button class="${cls}" data-live="${act}">${label}</button>`).join('');
     }
   },
 };
+
+/* ---------- sensor & ride-screen settings ---------- */
+function renderSensors() {
+  const box = $('#sensorBody'); if (!box) return;
+  if (!Sensors.supported) {
+    box.innerHTML = `<p class="sub" style="margin:0">${esc(Sensors.unsupportedText())}</p>`;
+  } else {
+    box.innerHTML = Object.entries(SENSOR_DEFS).map(([k, d]) => {
+      const e = Sensors.dev[k];
+      const status = !e ? 'Not connected' : e.state === 'on' ? `Connected · ${esc(e.name)}` : e.state === 'lost' ? `Lost connection · ${esc(e.name)}` : `Connecting · ${esc(e.name)}`;
+      const live = k === 'hr' ? Sensors.get('hr') : k === 'power' ? Sensors.get('power') : Sensors.get('cadence');
+      const unit = { hr: 'bpm', power: 'W', cad: 'rpm' }[k];
+      return `<div class="set-row"><div><div class="t">${d.label}</div><div class="d">${status}${e && live != null ? ` · ${live} ${unit}` : ''}</div></div>
+        ${e ? `<button class="sm" data-sensor-off="${k}">Disconnect</button>` : `<button class="sm primary" data-sensor-on="${k}">Connect</button>`}</div>`;
+    }).join('') + `<p class="sub" style="margin:10px 0 0">Wake the sensor (put the strap on or spin the cranks), then tap Connect. Reconnect before each ride.</p>`;
+  }
+  if (!$('#live').classList.contains('hidden')) Live.draw();
+}
+function renderRideSettings() {
+  const opts = Object.entries(LIVE_FIELDS).map(([k, [label]]) => `<option value="${k}">${label}</option>`).join('');
+  const keys = liveFields();
+  $('#fieldPicks').innerHTML = keys.map((k, i) => `<label class="field"><span>Box ${i + 1}</span><select data-field="${i}">${opts}</select></label>`).join('');
+  $$('#fieldPicks select').forEach((sel, i) => sel.value = keys[i]);
+  $('#autoPause').checked = autoPauseOn();
+  $('#autoLap').value = String(+Prefs.autoLap || 0);
+  $('#voiceEvery').value = String(+Prefs.voice || 0);
+}
+$('#fieldPicks').addEventListener('change', e => {
+  const i = +e.target.dataset.field; if (isNaN(i)) return;
+  const keys = liveFields(); keys[i] = e.target.value; Prefs.liveFields = keys; savePrefs(); toast('Ride screen updated');
+});
+$('#autoPause').addEventListener('change', e => { Prefs.autoPause = e.target.checked; savePrefs(); });
+$('#autoLap').addEventListener('change', e => { Prefs.autoLap = +e.target.value; savePrefs(); });
+$('#voiceEvery').addEventListener('change', e => { Prefs.voice = +e.target.value; savePrefs(); if (Prefs.voice) speak(`Voice updates every ${Prefs.voice} kilometre${Prefs.voice > 1 ? 's' : ''}.`); });
+$('#fieldsReset').onclick = () => { delete Prefs.liveFields; savePrefs(); renderRideSettings(); toast('Ride screen reset'); };
+document.addEventListener('click', async e => {
+  const on = e.target.closest('[data-sensor-on]'), off = e.target.closest('[data-sensor-off]');
+  if (off) Sensors.disconnect(off.dataset.sensorOff);
+  if (on) {
+    try { await Sensors.connect(on.dataset.sensorOn); toast(`${SENSOR_DEFS[on.dataset.sensorOn].label} connected`); }
+    catch (x) { if (x?.name !== 'NotFoundError') toast(x.message || 'Could not connect'); }   // NotFoundError = user cancelled the picker
+  }
+});
+setInterval(() => { if (currentView === 'settings' && Object.keys(Sensors.dev).length) renderSensors(); }, 2000);
+
 function syncRideBtn() {
   const b = $('#btnRide'), on = Live.s && Live.s.status === 'running';
   b.classList.toggle('rec', !!(Live.s && Live.s.status !== 'finished'));
@@ -1823,6 +2302,7 @@ function syncRideBtn() {
 $('#btnRide').onclick = () => Live.open();
 $('#liveClose').onclick = () => Live.close();
 $('#liveActions').onclick = e => { const b = e.target.closest('[data-live]'); if (b) Live[b.dataset.live](); };
+$('#liveViewSeg').onclick = e => { const b = e.target.closest('[data-lview]'); if (b) Live.setView(b.dataset.lview); };
 addEventListener('pagehide', () => Live.persist(true));
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') Live.persist(true);
