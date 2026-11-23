@@ -43,7 +43,7 @@
   --hero-glow: #5aa0ee;
   --shadow-sm: 0 1px 2px rgba(17,17,16,.04), 0 1px 1px rgba(17,17,16,.03);
   --shadow: 0 1px 2px rgba(17,17,16,.04), 0 6px 20px rgba(17,17,16,.05);
-  --radius: 16px;
+  --radius: 18px;
   --appbar: rgba(245,245,243,.82);
   --tabbar: rgba(255,255,255,.9);
 }
@@ -70,11 +70,16 @@
   --appbar: rgba(14,14,13,.82); --tabbar: rgba(24,24,23,.92);
 }
 
+@font-face {
+  font-family: "Inter"; font-style: normal; font-weight: 100 900; font-display: swap;
+  src: url("vendor/fonts/inter-latin.woff2") format("woff2");
+}
 * { box-sizing: border-box; }
 html, body { margin: 0; }
 body {
   background: var(--bg); color: var(--text);
-  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  font: 15px/1.5 "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  font-feature-settings: "cv11", "ss03"; /* Inter: single-storey a, rounded quotes */
   -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent;
 }
 svg.i { width: 20px; height: 20px; flex: none; }
@@ -158,8 +163,11 @@ select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmln
     padding: 6px 6px max(8px, env(safe-area-inset-bottom)); justify-content: space-around; gap: 0;
   }
   .tab { flex: 1; flex-direction: column; gap: 3px; font-size: .68rem; padding: 5px 4px; background: transparent !important; color: var(--text-3); }
-  .tab.on { color: var(--accent-ink); }
-  .tab svg.i { width: 24px; height: 24px; }
+  .tab.on { color: var(--accent-ink); font-weight: 650; }
+  .tab svg.i { width: 24px; height: 24px; position: relative; z-index: 1; }
+  .tab[data-view] { isolation: isolate; }
+  .tab[data-view]::before { content: ""; position: absolute; top: 3px; left: 50%; width: 0; height: 30px; transform: translateX(-50%); border-radius: 99px; background: var(--accent-soft); transition: width .2s ease; z-index: 0; }
+  .tab[data-view].on::before { width: 58px; }
   .tab-ride { margin: 0; color: var(--text-3); background: transparent; }
   .tab-ride .ride-bubble { display: grid; place-items: center; width: 52px; height: 52px; margin: -26px auto 0; border-radius: 50%; background: var(--good); color: #fff; box-shadow: 0 6px 16px rgba(0,131,0,.35), 0 0 0 5px var(--bg); }
   .tab-ride.rec .ride-bubble { background: var(--danger); box-shadow: 0 6px 16px rgba(201,59,58,.35), 0 0 0 5px var(--bg); animation: pulse 1.6s infinite; }
@@ -188,7 +196,7 @@ main { max-width: 1180px; margin: 0 auto; padding: 20px 16px 60px; }
 .two { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); margin-bottom: 14px; }
 @media (max-width: 860px) { .two { grid-template-columns: minmax(0, 1fr); } }
 .section-title { display: flex; justify-content: space-between; align-items: baseline; margin: 26px 2px 12px; }
-.section-title h2 { font-size: 1.08rem; margin: 0; letter-spacing: -.01em; }
+.section-title h2 { font-size: 1.15rem; margin: 0; letter-spacing: -.02em; }
 
 /* ---------- hero ---------- */
 .hero {
@@ -197,7 +205,10 @@ main { max-width: 1180px; margin: 0 auto; padding: 20px 16px 60px; }
   display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 20px; align-items: center; margin-bottom: 16px;
   box-shadow: 0 10px 30px rgba(31,99,181,.25);
 }
-.hero::after { content: ""; position: absolute; right: -60px; bottom: -80px; width: 260px; height: 260px; border-radius: 50%; border: 36px solid rgba(255,255,255,.06); pointer-events: none; }
+.hero::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .5;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='300' viewBox='0 0 600 300' fill='none' stroke='white' stroke-opacity='.16' stroke-width='1.4'%3E%3Cpath d='M-20 250 C 80 200 140 260 240 210 S 420 120 620 170'/%3E%3Cpath d='M-20 275 C 90 230 150 285 250 238 S 430 150 620 200'/%3E%3Cpath d='M-20 225 C 70 170 130 235 230 182 S 410 90 620 140'/%3E%3Cpath d='M-20 200 C 60 140 120 210 220 154 S 400 60 620 110'/%3E%3Cpath d='M300 -10 C 360 40 470 20 520 70 S 600 120 640 90'/%3E%3Cpath d='M330 -10 C 380 25 480 0 540 45 S 610 90 650 60'/%3E%3C/svg%3E") right bottom / cover no-repeat;
+}
 .hero .eyebrow { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; opacity: .8; font-weight: 600; }
 .hero h1 { margin: 4px 0 6px; font-size: clamp(1.45rem, 5vw, 2rem); letter-spacing: -.02em; line-height: 1.15; }
 .hero p { margin: 0; opacity: .88; font-size: .95rem; max-width: 46ch; }
@@ -232,7 +243,8 @@ main { max-width: 1180px; margin: 0 auto; padding: 20px 16px 60px; }
 @media (max-width: 520px) { .tiles { grid-template-columns: 1fr 1fr; gap: 10px; } }
 .tile { padding: 14px 16px; }
 .tile .label { display: flex; align-items: center; gap: 7px; color: var(--text-2); font-size: .78rem; font-weight: 550; }
-.tile .label svg { width: 16px; height: 16px; color: var(--accent); }
+.tile .label .ic { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent-ink); }
+.tile .label .ic svg { width: 15px; height: 15px; }
 .tile .value { font-size: 1.6rem; font-weight: 700; margin-top: 6px; letter-spacing: -.03em; font-variant-numeric: tabular-nums; line-height: 1.15; }
 .tile .value small { font-size: .9rem; font-weight: 550; color: var(--text-2); margin-left: 3px; letter-spacing: 0; }
 .tile .hint { color: var(--text-3); font-size: .78rem; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -255,12 +267,18 @@ main { max-width: 1180px; margin: 0 auto; padding: 20px 16px 60px; }
 /* ---------- ride cards (mobile list + recent) ---------- */
 .ride-list { display: grid; gap: 10px; }
 @media (min-width: 861px) { #recent { grid-template-columns: repeat(3, minmax(0, 1fr)); } #recent .empty-card { grid-column: 1 / -1; } }
-.ride-card { display: block; width: 100%; text-align: left; white-space: normal; padding: 14px 16px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-sm); font-weight: 400; }
+.ride-card { display: flex; align-items: stretch; justify-content: flex-start; gap: 14px; width: 100%; text-align: left; white-space: normal; padding: 14px 16px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-sm); font-weight: 400; }
+.rc-main { flex: 1; min-width: 0; }
+.rc-route { flex: none; width: 92px; align-self: center; height: 92px; border-radius: 14px; background: var(--surface-2); color: var(--accent); padding: 6px; }
+@media (max-width: 380px) { .rc-route { width: 72px; height: 72px; } }
 .ride-card:hover { background: var(--surface); border-color: var(--text-3); }
 .rc-top { display: flex; align-items: center; gap: 8px; font-size: .78rem; color: var(--text-3); }
 .rc-top .pos { margin-left: auto; }
 .rc-name { font-weight: 650; font-size: 1rem; margin: 5px 0 8px; color: var(--text); }
 .rc-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.rc-top > * { white-space: nowrap; }
+.rc-top > span:not(.pill):not(.pos) { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.ride-card:has(.rc-route) .rc-stats div { font-size: .9rem; }
 .rc-stats div { font-variant-numeric: tabular-nums; font-weight: 650; font-size: .98rem; color: var(--text); }
 .rc-stats span { display: block; font-size: .68rem; color: var(--text-3); font-weight: 500; text-transform: uppercase; letter-spacing: .04em; }
 .rc-notes { margin-top: 8px; font-size: .84rem; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -311,7 +329,7 @@ td.name .note { color: var(--text-3); font-size: .78rem; display: block; max-wid
 /* ---------- settings ---------- */
 .settings { max-width: 720px; display: grid; gap: 14px; }
 .set-card h2 { display: flex; align-items: center; gap: 9px; margin-bottom: 4px; }
-.set-card h2 svg { width: 18px; height: 18px; color: var(--accent); }
+.set-card h2 svg { width: 30px; height: 30px; padding: 7px; border-radius: 9px; background: var(--accent-soft); color: var(--accent-ink); }
 .set-card > .sub { margin: 0 0 16px; }
 .set-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 0; border-top: 1px solid var(--border); }
 .set-row:first-of-type { border-top: 0; }
@@ -363,7 +381,13 @@ dialog h2 { margin: 0 0 16px; font-size: 1.15rem; }
 }
 .live-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .live-top .seg button { padding: 6px 14px; }
-.live-status { font-size: .8rem; color: var(--text-2); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; flex: 1; min-width: 0; }
+.live-status { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; flex: 1; min-width: 0; }
+.chip { display: inline-flex; align-items: center; gap: 6px; font-size: .75rem; font-weight: 600; color: var(--text-2); background: var(--surface); border: 1px solid var(--border); border-radius: 99px; padding: 4px 10px; white-space: nowrap; }
+.chip:empty { display: none; }
+.chip.ok { color: var(--good); } .chip.bad { color: var(--danger); }
+.icon-btn { width: 40px; height: 40px; padding: 0; border-radius: 50%; }
+.trend { font-size: .8rem; font-weight: 650; margin-left: 6px; }
+.trend.up { color: var(--good); } .trend.down { color: var(--danger); }
 .live .dot { width: 10px; height: 10px; }
 .dot.rec { background: var(--danger); animation: blink 1.2s infinite; }
 .live-banner { text-align: center; font-weight: 650; font-size: .9rem; padding: 8px 12px; border-radius: 12px; background: var(--surface-2); color: var(--text-2); }
@@ -391,6 +415,8 @@ dialog h2 { margin: 0 0 16px; font-size: 1.15rem; }
 .live-mapstats span { font-size: .7rem; color: var(--text-3); text-transform: uppercase; letter-spacing: .05em; }
 .live-actions { display: grid; gap: 10px; max-width: 680px; width: 100%; margin: 0 auto; }
 .live-actions button { font-size: 1.15rem; font-weight: 650; min-height: 66px; border-radius: 18px; }
+.live-actions button.lap { background: var(--accent-soft); border-color: transparent; color: var(--accent-ink); }
+.live-actions button svg.i { width: 18px; height: 18px; }
 @media (orientation: landscape) and (max-height: 560px) {
   .live { padding-left: max(14px, env(safe-area-inset-left)); padding-right: max(14px, env(safe-area-inset-right)); }
   .live-main { flex-direction: row; align-items: center; max-width: none; gap: 16px; }
@@ -685,15 +711,15 @@ dialog h2 { margin: 0 0 16px; font-size: 1.15rem; }
 <!-- live ride mode (phone as bike computer) -->
 <section class="live hidden" id="live" aria-label="Ride mode">
   <div class="live-top">
-    <div class="live-status"><span class="dot" id="gpsDot"></span><span id="gpsText">GPS off</span><span id="wakeText"></span><span id="sensorText"></span></div>
+    <div class="live-status"><span class="chip"><span class="dot" id="gpsDot"></span><span id="gpsText">GPS off</span></span><span class="chip" id="wakeText"></span><span id="sensorText" style="display:contents"></span></div>
     <div class="seg" id="liveViewSeg" role="group" aria-label="Ride view"><button data-lview="stats">Stats</button><button data-lview="map">Map</button></div>
-    <button class="ghost sm" id="liveClose">Close</button>
+    <button class="icon-btn" id="liveClose" aria-label="Close ride screen" title="Back to dashboard"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
   </div>
   <div class="live-banner hidden" id="liveBanner"></div>
   <div class="live-flash hidden" id="liveFlash"></div>
   <div class="live-msg hidden" id="liveMsg"></div>
   <div class="live-main" id="liveStats">
-    <div class="live-speed"><div class="v" id="lvSpeed">0.0</div><div class="u">km/h</div></div>
+    <div class="live-speed"><div class="v" id="lvSpeed">0.0</div><div class="u">km/h<span class="trend" id="lvTrend"></span></div></div>
     <div class="live-grid" id="liveGrid"></div>
   </div>
   <div class="live-mapwrap hidden" id="liveMapWrap"><div id="liveMap"></div><div class="live-mapstats" id="liveMapStats"></div></div>
@@ -704,7 +730,7 @@ dialog h2 { margin: 0 0 16px; font-size: 1.15rem; }
 
 <script>
 'use strict';
-const APP_VERSION = '4.0';
+const APP_VERSION = '4.1';
 /* =================================================================
    1. DATA MODEL
    -----------------------------------------------------------------
@@ -1332,7 +1358,7 @@ function renderTiles(rides) {
   const longest = rides.slice().sort((a, b) => b.distance - a.distance)[0];
   const podiums = placed.filter(r => r.position <= 3).length;
   const tile = (ic, label, value, unit, hint) =>
-    `<div class="card tile"><div class="label">${icon(ic)}${label}</div><div class="value">${value}${unit ? `<small>${unit}</small>` : ''}</div><div class="hint">${hint}</div></div>`;
+    `<div class="card tile"><div class="label"><span class="ic">${icon(ic)}</span>${label}</div><div class="value">${value}${unit ? `<small>${unit}</small>` : ''}</div><div class="hint">${hint}</div></div>`;
   $('#tiles').innerHTML = [
     tile('road', 'Distance', fmtKm(totalKm, 0), 'km', `${rides.length} ride${rides.length === 1 ? '' : 's'}`),
     tile('clock', 'Ride time', fmtDuration(totalT, false), '', rides.length ? `${fmtKm(totalKm / (totalT / 3600))} km/h average` : '—'),
@@ -1486,18 +1512,43 @@ function posBadge(r) {
   if (!r.position) return '';
   return `<span class="pos ${r.position === 1 ? 'p1' : r.position <= 3 ? 'pod' : ''}">${ordinal(r.position)}</span>`;
 }
+/** small drawing of a ride's route for the ride cards (no map tiles needed) */
+const routeCache = new Map();
+function routeSvg(r) {
+  if (!r.track) return '';
+  const key = r.id + ':' + r.track.length;
+  if (routeCache.has(key)) return routeCache.get(key);
+  let svg = '';
+  try {
+    const pts = decodeTrack(r.track);
+    if (pts.length > 1) {
+      const kx = Math.cos(pts[0][0] * Math.PI / 180);
+      const xs = pts.map(p => p[1] * kx), ys = pts.map(p => -p[0]);
+      const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+      const W = 80, H = 80, pad = 6, sc = Math.min((W - 2 * pad) / (maxX - minX || 1e-9), (H - 2 * pad) / (maxY - minY || 1e-9));
+      const ox = (W - (maxX - minX) * sc) / 2, oy = (H - (maxY - minY) * sc) / 2;
+      const P = pts.map((_, i) => [(xs[i] - minX) * sc + ox, (ys[i] - minY) * sc + oy]);
+      const d = P.map((q, i) => (i ? 'L' : 'M') + q[0].toFixed(1) + ' ' + q[1].toFixed(1)).join('');
+      const [a, z] = [P[0], P[P.length - 1]];
+      svg = `<svg class="rc-route" viewBox="0 0 ${W} ${H}" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>` +
+        `<circle cx="${a[0].toFixed(1)}" cy="${a[1].toFixed(1)}" r="3.6" fill="var(--good)" stroke="var(--surface-2)" stroke-width="1.5"/><circle cx="${z[0].toFixed(1)}" cy="${z[1].toFixed(1)}" r="3.6" fill="var(--danger)" stroke="var(--surface-2)" stroke-width="1.5"/></svg>`;
+    }
+  } catch {}
+  routeCache.set(key, svg);
+  return svg;
+}
 function rideCard(r) {
-  return `<button class="ride-card" data-edit="${r.id}">
-    <div class="rc-top"><span class="pill ${r.type}">${TYPES[r.type]}</span>${r.track ? '<span class="pill">GPS</span>' : ''}<span>${fmtDate(r.date)}</span>${posBadge(r)}</div>
+  return `<button class="ride-card" data-edit="${r.id}"><div class="rc-main">
+    <div class="rc-top"><span class="pill ${r.type}">${TYPES[r.type]}</span><span>${r.track ? fmtShort(r.date) : fmtDate(r.date)}</span>${posBadge(r)}</div>
     <div class="rc-name">${esc(r.name)}</div>
     <div class="rc-stats">
       <div>${fmtKm(r.distance)}<span>km</span></div>
-      <div>${fmtDuration(r.time, false).replace(' ', ' ')}<span>time</span></div>
+      <div>${fmtDuration(r.time).replace(/:\d\d$/, "")}<span>h:mm</span></div>
       <div>${fmtKm(Metrics.speed(r))}<span>km/h</span></div>
       <div>${Math.round(r.elevation).toLocaleString()}<span>m up</span></div>
     </div>
     ${r.notes ? `<div class="rc-notes">${esc(r.notes)}</div>` : ''}
-  </button>`;
+  </div>${routeSvg(r)}</button>`;
 }
 function emptyCard() {
   return `<div class="card empty-card"><div class="ic">${icon('bike')}</div><h3>No rides yet</h3>
@@ -2157,12 +2208,12 @@ const Live = {
   },
 
   async keepAwake() {
-    if (!('wakeLock' in navigator)) { $('#wakeText').textContent = '· keep screen on manually'; return; }
+    if (!('wakeLock' in navigator)) { $('#wakeText').textContent = 'Turn off auto-lock'; return; }
     try {
       this.wake = await navigator.wakeLock.request('screen');
-      $('#wakeText').textContent = '· screen stays on';
+      $('#wakeText').textContent = 'Screen stays on';
       this.wake.addEventListener('release', () => { this.wake = null; });
-    } catch { $('#wakeText').textContent = '· keep screen on manually'; }
+    } catch { $('#wakeText').textContent = 'Turn off auto-lock'; }
   },
   releaseWake() { try { this.wake?.release(); } catch {} this.wake = null; $('#wakeText').textContent = ''; },
 
@@ -2231,14 +2282,20 @@ const Live = {
     banner.textContent = bannerText; banner.classList.toggle('hidden', !bannerText);
     banner.classList.toggle('auto', st === 'running' && s.autoPaused);
     // sensors
-    const sens = Object.entries(Sensors.dev).map(([k, e]) => `${SENSOR_DEFS[k].short}${e.state === 'on' ? ' ✓' : e.state === 'lost' ? ' ✕' : ' …'}`);
-    $('#sensorText').textContent = sens.length ? '· ' + sens.join(' · ') : '';
+    $('#sensorText').innerHTML = Object.entries(Sensors.dev).map(([k, e]) =>
+      `<span class="chip ${e.state === 'on' ? 'ok' : e.state === 'lost' ? 'bad' : ''}">${SENSOR_DEFS[k].short} ${e.state === 'on' ? '✓' : e.state === 'lost' ? '✕' : '…'}</span>`).join('');
+    // faster or slower than your average?
+    const tr = $('#lvTrend'), avgMs = s.moving > 30 ? s.dist / s.moving : 0;
+    if (st === 'running' && avgMs && s.speed > 0.5) {
+      const up = s.speed > avgMs * 1.03, down = s.speed < avgMs * .97;
+      tr.className = 'trend ' + (up ? 'up' : down ? 'down' : ''); tr.textContent = up ? '▲ above avg' : down ? '▼ below avg' : '● on avg';
+    } else { tr.className = 'trend'; tr.textContent = ''; }
     if (this.s && st !== 'finished') $('#gpsDot').classList.toggle('rec', st === 'running' && this.watchId != null && $('#gpsDot').classList.contains('ok'));
     // buttons
     const btns = {
       idle: [['go', `${icon('play')} Start ride`, 'start']],
-      running: [['', 'Lap', 'lap'], ['', '❚❚ Pause', 'pause'], ['danger', '■ Finish', 'finish']],
-      paused: [['go', `${icon('play')} Resume`, 'resume'], ['danger', '■ Finish', 'finish']],
+      running: [['lap', 'Lap', 'lap'], ['', '❚❚ Pause', 'pause'], ['danger-solid', '■ Finish', 'finish']],
+      paused: [['go', `${icon('play')} Resume`, 'resume'], ['danger-solid', '■ Finish', 'finish']],
       finished: [['primary', 'Save ride', 'save'], ['danger', 'Discard', 'discard']],
     }[st];
     const box = $('#liveActions');
