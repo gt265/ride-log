@@ -664,10 +664,10 @@ dialog h2 { margin: 0 0 16px; font-size: 1.15rem; }
 
       <div class="card set-card">
         <h2><svg class="i"><use href="#i-db"/></svg>Your data</h2>
-        <div class="set-row"><div><div class="t">Import rides</div><div class="d">Add rides from a CSV file</div></div><button id="btnImport">Import CSV</button></div>
+        <div class="set-row"><div><div class="t">Import rides</div><div class="d">A CSV file, or rides from the Ride Log bike computer</div></div><button id="btnImport">Import</button></div>
         <div class="set-row"><div><div class="t">Export rides</div><div class="d">Download all rides as a CSV backup</div></div><button id="btnExport">Export CSV</button></div>
         <div class="set-row"><div><div class="t">Delete all rides</div><div class="d" id="deleteAllHint">Removes every ride from this device</div></div><button class="danger" id="btnDeleteAll">Delete all</button></div>
-        <input type="file" id="fileInput" accept=".csv,text/csv" class="hidden">
+        <input type="file" id="fileInput" accept=".csv,.json,text/csv,application/json" class="hidden">
       </div>
 
       <div class="card set-card">
@@ -977,6 +977,25 @@ function importCSV(text) {
       existing.add(key); fresh.push(ride);
     } catch { skipped++; }
   });
+  if (fresh.length) Store.addMany(fresh);
+  return { added: fresh.length, skipped };
+}
+
+/** Ride Log JSON: an array of rides, e.g. from the Ride Log bike computer (keeps route, laps and sensor data). */
+function importJSON(text) {
+  let data;
+  try { data = JSON.parse(text); } catch { throw new Error('That file isn\u2019t valid JSON'); }
+  if (!Array.isArray(data)) data = [data];
+  const ids = new Set(Store.rides.map(r => r.id)), keys = new Set(Store.rides.map(r => `${r.date}|${r.name}|${r.distance}`));
+  let skipped = 0; const fresh = [];
+  for (const raw of data) {
+    try {
+      const r = makeRide({ ...raw, updatedAt: 0 });
+      const key = `${r.date}|${r.name}|${r.distance}`;
+      if (ids.has(r.id) || keys.has(key)) { skipped++; continue; }
+      ids.add(r.id); keys.add(key); fresh.push(r);
+    } catch { skipped++; }
+  }
   if (fresh.length) Store.addMany(fresh);
   return { added: fresh.length, skipped };
 }
@@ -2419,7 +2438,10 @@ $('#btnExport').onclick = () => Store.rides.length ? download(`rides-${isoDate(n
 $('#btnImport').onclick = () => $('#fileInput').click();
 $('#fileInput').onchange = async e => {
   const file = e.target.files[0]; if (!file) return;
-  try { const { added, skipped } = importCSV(await file.text()); toast(`Imported ${added} ride${added === 1 ? '' : 's'}${skipped ? `, skipped ${skipped}` : ''}`); render(); }
+  try {
+    const text = await file.text();
+    const { added, skipped } = /\.json$/i.test(file.name) || /^\s*[\[{]/.test(text) ? importJSON(text) : importCSV(text);
+    toast(`Imported ${added} ride${added === 1 ? '' : 's'}${skipped ? `, skipped ${skipped}` : ''}`); render(); }
   catch (err) { toast('Import failed: ' + err.message); }
   e.target.value = '';
 };

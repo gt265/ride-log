@@ -6,6 +6,13 @@ A small GPS bike computer you can build yourself. It's about the size of a Garmi
 |---|---|---|
 | ![front](images/front.png) | ![back](images/back.png) | ![exploded](images/exploded.png) |
 
+## Building the prototype: order of steps
+1. **Order the parts** (list below).
+2. **Breadboard first:** wire everything on a breadboard (see Wiring), install the firmware ([`firmware/README.md`](firmware/README.md)), and check the screen, GPS, buttons and sensors work before soldering anything.
+3. **Measure the display board** with calipers. If it isn't 72 × 46 mm, update `bike_computer.py`, or send the measurements and the case will be resized.
+4. **Print the case** in PETG or ASA, on your own printer or through an online service (JLC3DP, Craftcloud, a local makerspace).
+5. **Solder and assemble** (steps at the bottom), then go for a ride and import it into the app.
+
 ## Files
 | File | What it is |
 |---|---|
@@ -83,8 +90,9 @@ BAT+ / BAT- pads ────  LiPo red / black   (pads on the underside of the 
 5. Put the battery in the cradle on the back cover, wrapped in Kapton tape.
 6. Screw the back on. Stick the Garmin adapter into the square recess.
 
-## Software (next step)
-The plan for the firmware (Arduino / PlatformIO):
+## Software
+**Done:** see [`firmware/`](firmware/). It covers the ride screens, GPS, barometer, buttons, Bluetooth heart-rate, power and cadence, saving rides, and Wi-Fi transfer of rides to your phone for import into the app.
+The original plan, for reference:
 - **Display and controls:** draw the same ride screen as the app (speed, distance, time, laps, zones) on the Sharp display, and use the three buttons for Lap, Start/Pause and Page.
 - **Sensors:** read the GPS and barometer, and connect to heart-rate and power sensors over Bluetooth with the NimBLE library.
 - **Storage and upload:** save rides to the XIAO's 8 MB flash. Back home, upload them over Wi-Fi straight into your **Ride Log account** (the same Supabase database the app uses), so they appear in the app automatically.
