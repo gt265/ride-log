@@ -26,6 +26,9 @@ header p { margin: 0; color: var(--ink-2); max-width: 62ch; }
 .stat .v { font-family: var(--display); font-size: 1.5rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 .bar { height: 6px; border-radius: 99px; background: var(--line); overflow: hidden; margin-top: 6px; }
 .bar span { display: block; height: 100%; width: 0; background: var(--done); transition: width .3s; }
+.tabs { display: inline-flex; background: var(--line); border-radius: 12px; padding: 3px; gap: 2px; justify-self: start; }
+.tabs button { font: inherit; font-weight: 600; font-size: .9rem; border: 0; background: transparent; color: var(--ink-2); padding: 8px 14px; border-radius: 9px; cursor: pointer; }
+.tabs button[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
 .group { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
 .group h2 { font-family: var(--display); font-size: 1.05rem; margin: 0; padding: 14px 16px 4px; display: flex; justify-content: space-between; gap: 10px; align-items: baseline; flex-wrap: wrap; }
 .group h2 small { font-family: var(--body); font-weight: 500; font-size: .8rem; color: var(--ink-3); }
@@ -58,8 +61,12 @@ a.buy:focus-visible, .item input:focus-visible, button:focus-visible { outline: 
 <div class="wrap">
   <header>
     <h1>Bike computer parts</h1>
-    <p>Everything for the Ride Log bike computer prototype, grouped by shop so you can order each group in one go. Tick items off as you order them; your ticks are remembered in this browser.</p>
+    <p id="intro"></p>
   </header>
+  <div class="tabs" role="tablist" aria-label="Which version">
+    <button role="tab" data-list="v1" id="tab-v1">v1 · AliExpress</button>
+    <button role="tab" data-list="adafruit" id="tab-adafruit">Later · Adafruit</button>
+  </div>
 
   <div class="summary">
     <div class="stat"><div class="l">Parts total</div><div class="v" id="total">$0</div></div>
@@ -71,13 +78,44 @@ a.buy:focus-visible, .item input:focus-visible, button:focus-visible { outline: 
 
   <div class="foot">
     <span>Prices without "~" were checked on the shop's page in November 2026; "~" means approximate. Shipping and tax aren't included.</span>
-    <span>Amazon links open a search, because these generic parts come from many sellers. Pick one that matches the size or spec in the note.</span>
+    <span id="footnote"></span>
     <button id="reset" type="button">Clear all ticks</button>
   </div>
 </div>
 
 <script>
-const GROUPS = [
+const ALI = q => 'https://www.aliexpress.com/w/wholesale-' + encodeURIComponent(q.replace(/ /g, '-')) + '.html';
+const V1 = [
+  { shop: 'AliExpress: electronics', hint: 'Order first (2–3 weeks)', intro: 'Search links, because the same parts come from many sellers. Pick listings with lots of orders and good reviews, and match the spec in the note.', items: [
+    { id: 'v1-xiao', name: 'Seeed Studio XIAO ESP32S3', pn: 'plain version: not "Sense", not "Plus"', note: 'The brain. Buy from the Seeed Studio official store if you can; avoid unbranded copies.', price: 8, approx: true, url: ALI('Seeed XIAO ESP32S3') },
+    { id: 'v1-epd', name: 'Waveshare 2.9" e-Paper Module, black/white, V2', pn: '296×128, SSD1680, board 89.5 × 38 mm', note: 'The screen. Get the "Module" (with driver board and cable), not the bare "raw panel" and not the red/black (B) version.', price: 14, approx: true, url: ALI('Waveshare 2.9 inch e-Paper Module V2') },
+    { id: 'v1-gps', name: 'ATGM336H GPS module with ceramic antenna', pn: 'ATGM336H-5N, 3.3 V, UART, 25 × 25 mm antenna', note: 'GPS + BeiDou. Board about 16 × 14 mm.', price: 5, approx: true, url: ALI('ATGM336H GPS module antenna') },
+    { id: 'v1-baro', name: 'GY-BMP280 barometer board, 3.3 V', pn: 'BMP280, I²C', note: 'Climbing. Make sure it says BMP280, not BME280-labelled fakes.', price: 1.5, approx: true, url: ALI('GY-BMP280 3.3V') },
+    { id: 'v1-batt', name: 'LiPo battery 603450, 3.7 V ~1200 mAh', pn: 'with protection board, 2-wire leads', note: 'No bigger than 50 × 34 × 6 mm. Check red/black against the XIAO pads before connecting.', price: 4, approx: true, url: ALI('603450 lipo battery 1200mah') },
+    { id: 'v1-sw', name: 'Mini slide switch SS12D00', pn: '1P2T, 2.54 mm pins', note: 'Power on/off. Packs of 20+ for about a dollar.', price: 1, approx: true, url: ALI('SS12D00 slide switch') },
+    { id: 'v1-btn', name: '7 mm momentary push buttons', qty: '× 3', pn: 'normally open, PBS-110 style', note: 'Lap, Start/Pause and Page.', price: 2, approx: true, url: ALI('7mm momentary push button PBS-110') },
+  ]},
+  { shop: 'AliExpress: case and assembly', hint: 'Same order', intro: 'Small packs; most include plenty of spares.', items: [
+    { id: 'v1-ins', name: 'M2.5 heat-set threaded inserts', qty: '× 4', pn: 'outer diameter ~3.5–3.6 mm, 4 mm long', note: 'Pressed into the case with the soldering iron.', price: 2.5, approx: true, url: ALI('M2.5 heat set insert brass') },
+    { id: 'v1-scr', name: 'M2.5 × 6 mm screws', qty: '× 4', pn: 'button head', note: 'Hold the back cover on.', price: 1.5, approx: true, url: ALI('M2.5 6mm button head screw') },
+    { id: 'v1-acr', name: 'Clear acrylic sheet, 1 mm', pn: 'cut to 73.4 × 35.6 mm', note: 'The screen window. Scores and snaps with a craft knife.', price: 2.5, approx: true, url: ALI('1mm clear acrylic sheet') },
+    { id: 'v1-mnt', name: 'Garmin quarter-turn adapter, adhesive', pn: 'stick-on, flat back', note: 'Sticks into the recess on the back. Fits any Garmin bar mount.', price: 2, approx: true, url: ALI('garmin quarter turn mount adapter adhesive') },
+    { id: 'v1-barm', name: 'Garmin-style out-front bar mount', pn: '31.8 mm bars', note: 'Skip if you already have one.', price: 5, approx: true, url: ALI('garmin out front bike mount') },
+    { id: 'v1-wire', name: 'Silicone wire, 30 AWG', pn: 'multi-colour', note: 'Thin and flexible for inside the case.', price: 3, approx: true, url: ALI('30AWG silicone wire') },
+    { id: 'v1-tape', name: 'Foam tape + Kapton tape', pn: '1 mm double-sided foam; heat-resistant Kapton', note: 'Cushions the screen, holds the boards, insulates the battery.', price: 3, approx: true, url: ALI('kapton tape') },
+    { id: 'v1-bb', name: 'Breadboard and jumper wires', pn: 'half-size + male-male', note: 'For testing everything before you solder.', price: 3, approx: true, url: ALI('400 point breadboard jumper wire') },
+  ]},
+  { shop: 'For the case', hint: 'Pick one', intro: 'Print the two STL files in hardware/out/v1_epaper. If you don\u2019t have a printer, a print service is about $10–20.', items: [
+    { id: 'v1-petg', name: 'PETG filament, 1.75 mm', pn: 'black or dark grey', note: 'One case uses about 30 g. Don\u2019t use PLA; it softens in a hot car.', price: 12, approx: true, url: ALI('PETG filament 1.75mm') },
+    { id: 'v1-svc', name: 'Or: online 3D print service', pn: 'upload front_shell.stl + back_cover.stl, PETG or ASA', note: 'JLC3DP and Craftcloud both take STL uploads.', price: 15, approx: true, optional: true, url: 'https://craftcloud3d.com/' },
+  ]},
+  { shop: 'Tools', hint: 'If you don\u2019t have them', intro: 'Not counted in the parts total.', tools: true, items: [
+    { id: 'v1-iron', name: 'Soldering iron kit', pn: 'temperature-controlled', note: 'Also presses in the heat-set inserts (about 220 °C).', price: 15, approx: true, url: ALI('soldering iron kit temperature') },
+    { id: 'v1-cal', name: 'Digital calipers', pn: '150 mm', note: 'To measure the screen board before printing.', price: 8, approx: true, url: ALI('digital caliper 150mm') },
+    { id: 'v1-usbc', name: 'USB-C data cable', pn: 'data, not charge-only', note: 'For uploading the firmware. Most phone cables work.', price: 2, approx: true, url: ALI('usb c data cable') },
+  ]},
+];
+const ADAFRUIT = [
   { shop: 'Adafruit', hint: 'One order', intro: 'The screen, GPS, barometer and the two small cables all come from Adafruit, so one cart covers them.', items: [
     { id: 'disp', name: 'SHARP Memory Display Breakout 2.7" 400×240', pn: 'Adafruit 4694', note: 'The sunlight-readable screen. Measure its board when it arrives (the case assumes 72 × 46 mm).', price: 45, approx: true, url: 'https://www.adafruit.com/product/4694' },
     { id: 'gps', name: 'Mini GPS PA1010D (STEMMA QT)', pn: 'Adafruit 4415', note: 'GPS with built-in antenna, 25.5 × 25.4 mm.', price: 29.95, url: 'https://www.adafruit.com/product/4415' },
@@ -93,7 +131,7 @@ const GROUPS = [
     { id: 'btn', name: '7 mm momentary push buttons', qty: '× 3', pn: 'normally open, PBS-110 style', note: 'Lap, Start/Pause and Page. Usually sold in packs of 10+.', price: 6, approx: true, url: 'https://www.amazon.com/s?k=7mm+momentary+push+button+normally+open' },
     { id: 'ins', name: 'M2.5 heat-set threaded inserts', qty: '× 4', pn: 'outer diameter ~3.5–3.6 mm, 4 mm long', note: 'Kits often include M2.5 screws too.', price: 9, approx: true, url: 'https://www.amazon.com/s?k=M2.5+heat+set+threaded+inserts+kit' },
     { id: 'scr', name: 'M2.5 × 6 mm screws', qty: '× 4', pn: 'button or countersunk head', note: 'Skip if your insert kit includes them.', price: 6, approx: true, url: 'https://www.amazon.com/s?k=M2.5+x+6mm+screws+button+head' },
-    { id: 'acr', name: 'Clear acrylic or polycarbonate sheet, 1 mm', pn: 'cut to 65.8 × 42.3 mm', note: 'The screen window. Scores and snaps with a craft knife.', price: 8, approx: true, url: 'https://www.amazon.com/s?k=1mm+clear+acrylic+sheet' },
+    { id: 'acr', name: 'Clear acrylic or polycarbonate sheet, 1 mm', pn: 'cut to 65.3 × 41.8 mm', note: 'The screen window. Scores and snaps with a craft knife.', price: 8, approx: true, url: 'https://www.amazon.com/s?k=1mm+clear+acrylic+sheet' },
     { id: 'mnt', name: 'Garmin quarter-turn adapter, adhesive', pn: 'stick-on, flat back', note: 'Sticks into the recess on the back of the case.', price: 8, approx: true, url: 'https://www.amazon.com/s?k=garmin+quarter+turn+mount+adapter+adhesive' },
     { id: 'wire', name: 'Silicone hook-up wire, 28–30 AWG', pn: 'multi-colour kit', note: 'Thin and flexible for inside the case.', price: 8, approx: true, url: 'https://www.amazon.com/s?k=30+awg+silicone+wire+kit' },
     { id: 'res', name: '220 kΩ resistors', qty: '× 2', pn: '1/4 W, 1%', note: 'For measuring battery level.', price: 5, approx: true, url: 'https://www.amazon.com/s?k=220k+ohm+resistor+1%25' },
@@ -101,7 +139,7 @@ const GROUPS = [
     { id: 'kap', name: 'Kapton tape', pn: 'heat-resistant insulating tape', note: 'Wraps the battery and insulates solder joints.', price: 6, approx: true, url: 'https://www.amazon.com/s?k=kapton+tape' },
     { id: 'bb', name: 'Breadboard and jumper wires', pn: 'half-size breadboard + male-male jumpers', note: 'For testing everything before you solder.', price: 9, approx: true, url: 'https://www.amazon.com/s?k=half+size+breadboard+jumper+wires+kit' },
   ]},
-  { shop: 'For the case', hint: 'Pick one', intro: 'If you have a 3D printer you only need filament. Otherwise, upload the two STL files from hardware/out to a print service.', items: [
+  { shop: 'For the case', hint: 'Pick one', intro: 'If you have a 3D printer you only need filament. Otherwise, upload the two STL files from hardware/out/adafruit_sharp to a print service.', items: [
     { id: 'petg', name: 'PETG filament, 1.75 mm, 1 kg', pn: 'black or dark grey', note: 'One case uses about 30 g. Don’t use PLA; it softens in a hot car.', price: 20, approx: true, url: 'https://www.amazon.com/s?k=petg+filament+1.75mm+black' },
     { id: 'svc', name: 'Or: online 3D print service', pn: 'upload front_shell.stl + back_cover.stl, choose PETG or ASA', note: 'JLC3DP and Craftcloud both take STL uploads. Usually about $10–20 per set plus shipping.', price: 15, approx: true, optional: true, url: 'https://craftcloud3d.com/' },
   ]},
@@ -111,6 +149,13 @@ const GROUPS = [
     { id: 'usbc', name: 'USB-C data cable', pn: 'data, not charge-only', note: 'For uploading the firmware. Most phone cables work.', price: 7, approx: true, url: 'https://www.amazon.com/s?k=usb+c+data+cable' },
   ]},
 ];
+const LISTS = {
+  v1: { groups: V1, intro: 'v1 uses cheap AliExpress parts: an e-paper screen, ATGM336H GPS and BMP280 barometer. Order everything in one AliExpress cart; delivery usually takes 2–3 weeks. Tick items off as you order; your ticks are remembered in this browser.',
+        foot: 'All prices are approximate AliExpress prices for one unit or the smallest pack, before shipping. Links open a search, because the same parts come from many sellers.' },
+  adafruit: { groups: ADAFRUIT, intro: 'The higher-quality version for later: Adafruit\u2019s Sharp sunlight screen, PA1010D GPS and BMP390 barometer. Same firmware (switch HW_ADAFRUIT on in config.h) and its own case (hardware/out/adafruit_sharp).',
+        foot: 'Prices without "~" were checked on the shop\u2019s page in November 2026; "~" means approximate. Amazon links open a search, because these generic parts come from many sellers.' },
+};
+let current = 'v1';
 const KEY = 'bikecomputer.parts.v1';
 let ticks = {};
 try { ticks = JSON.parse(localStorage.getItem(KEY)) || {}; } catch {}
@@ -119,6 +164,10 @@ const money = v => '$' + v.toFixed(v % 1 ? 2 : 0);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 function render() {
+  const GROUPS = LISTS[current].groups;
+  document.getElementById('intro').textContent = LISTS[current].intro;
+  document.getElementById('footnote').textContent = LISTS[current].foot;
+  document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.list === current)));
   document.getElementById('groups').innerHTML = GROUPS.map(g => `
     <section class="group" aria-label="${esc(g.shop)}">
       <h2>${esc(g.shop)} <small>${esc(g.hint)}</small></h2>
@@ -137,6 +186,7 @@ function render() {
   totals();
 }
 function totals() {
+  const GROUPS = LISTS[current].groups;
   const parts = GROUPS.filter(g => !g.tools).flatMap(g => g.items).filter(i => !i.optional);
   const all = GROUPS.flatMap(g => g.items);
   const total = parts.reduce((a, i) => a + i.price, 0);
@@ -157,5 +207,8 @@ document.getElementById('reset').addEventListener('click', e => {
   if (!armed) { armed = true; e.target.textContent = 'Tap again to clear all ticks'; setTimeout(() => { armed = false; e.target.textContent = 'Clear all ticks'; }, 3000); return; }
   ticks = {}; save(); render(); armed = false; e.target.textContent = 'Clear all ticks';
 });
-render();
+function fromHash() { const h = location.hash.slice(1); current = LISTS[h] ? h : 'v1'; render(); }
+document.querySelector('.tabs').addEventListener('click', e => { const b = e.target.closest('[data-list]'); if (b) { location.hash = b.dataset.list; } });
+addEventListener('hashchange', fromHash);
+fromHash();
 </script>

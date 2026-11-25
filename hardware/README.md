@@ -1,10 +1,56 @@
 # Ride Log bike computer: hardware
 
-A small GPS bike computer you can build yourself. It's about the size of a Garmin Edge 530: **77 × 51 × 26.5 mm**, with a 2.7" screen you can read in sunlight, GPS, a barometer for climbing, and three buttons. It connects to heart-rate and power sensors over Bluetooth, which also works with iPhones, because the device does the Bluetooth itself.
+A small GPS bike computer you can build yourself, with a screen you can read in sunlight, GPS, a barometer for climbing, and three buttons. It connects to heart-rate and power sensors over Bluetooth, which also works with iPhones, because the device does the Bluetooth itself.
 
 | Front | Back | Exploded |
 |---|---|---|
 | ![front](images/front.png) | ![back](images/back.png) | ![exploded](images/exploded.png) |
+
+## Two versions
+| | **v1: AliExpress (build this first)** | Adafruit (later) |
+|---|---|---|
+| Screen | Waveshare 2.9" e-paper, 296×128 | Sharp 2.7" memory LCD, 400×240 |
+| GPS / barometer | ATGM336H / BMP280 | PA1010D / BMP390 |
+| Case | 94.7 × 43.2 × 25 mm | 77.2 × 51.2 × 27.5 mm |
+| Files | `out/v1_epaper/` | `out/adafruit_sharp/` |
+| Parts | **~$70** | ~$196 |
+| Firmware setting (`config.h`) | `HW_V1_ALIEXPRESS` | `HW_ADAFRUIT` |
+
+Shopping list with links for both versions: [`shopping-list.html`](shopping-list.html) (open it in a browser).
+
+| v1 front | v1 exploded |
+|---|---|
+| ![v1 front](images/v1_front.png) | ![v1 exploded](images/v1_exploded.png) |
+
+### v1 wiring
+
+```
+XIAO ESP32-S3   Part
+─────────────   ──────────────────────────────────────────────
+3V3  ─────────  e-paper VCC · e-paper RST · GPS VCC · BMP280 VCC · BMP280 CSB
+GND  ─────────  e-paper GND · GPS GND · BMP280 GND · BMP280 SDO · all 3 buttons
+D8   ─────────  e-paper CLK
+D10  ─────────  e-paper DIN
+D3   ─────────  e-paper CS
+D6   ─────────  e-paper DC
+D9   ─────────  e-paper BUSY
+D4 (SDA) ─────  BMP280 SDA
+D5 (SCL) ─────  BMP280 SCL
+D7   ─────────  GPS TX            (GPS RX not connected)
+D0   ─────────  Button "Lap"          (other leg to GND)
+D1   ─────────  Button "Start/Pause"  (other leg to GND)
+D2   ─────────  Button "Page"         (other leg to GND)
+Battery red ──  slide switch (middle pin) ── outer pin ── XIAO BAT+ pad
+Battery black ─ XIAO BAT- pad
+```
+- **v1 trade-offs.** The XIAO runs out of pins, so v1 doesn't show battery %, and it uses a slide switch for power instead of sleep mode. The battery only charges while the switch is **on**.
+- **BMP280 address.** With SDO on GND and CSB on 3V3 the BMP280 talks I²C at address 0x76. If the Device screen says "Baro missing", change `BARO_I2C_ADDR` to 0x77.
+- **Screen refresh.** The e-paper updates once a second while you ride. About every 3 minutes it does a full refresh, flashing black for a moment to clear faint "ghosts" of old numbers. Hold **PAGE** to do one any time.
+- **Measure before printing.** The e-paper module's board (89.5 × 38 mm) is from Waveshare's datasheet. The screen's offset on the board (`ACTIVE_OFFSET`, assumed 3 mm towards the plug end) and the BMP280 board size are **assumptions**. Measure yours, then re-run `bike_computer.py v1_epaper`.
+
+---
+
+# Adafruit version (later)
 
 ## Building the prototype: order of steps
 1. **Order the parts** (list below).
@@ -17,9 +63,9 @@ A small GPS bike computer you can build yourself. It's about the size of a Garmi
 | File | What it is |
 |---|---|
 | `bike_computer.py` | The parametric CAD model ([CadQuery](https://cadquery.readthedocs.io)). All the sizes are at the top. |
-| `out/front_shell.step`, `out/back_cover.step` | Printed parts. **These open in SolidWorks**, Fusion 360, Onshape, FreeCAD and Shapr3D. |
-| `out/assembly.step` | The whole device, with stand-in blocks for the bought parts so you can check the fit. |
-| `out/front_shell.stl`, `out/back_cover.stl` | Ready to slice and 3D print. |
+| `out/<version>/front_shell.step`, `out/<version>/back_cover.step` | Printed parts. **These open in SolidWorks**, Fusion 360, Onshape, FreeCAD and Shapr3D. |
+| `out/<version>/assembly.step` | The whole device, with stand-in blocks for the bought parts so you can check the fit. |
+| `out/<version>/front_shell.stl`, `out/<version>/back_cover.stl` | Ready to slice and 3D print. |
 
 To rebuild the files after changing a size:
 
@@ -28,7 +74,7 @@ pip install cadquery
 ```
 
 ```bash
-python bike_computer.py
+python bike_computer.py            # both versions; or add v1_epaper / adafruit_sharp
 ```
 
 ## Parts to buy (about $130–$150 total)

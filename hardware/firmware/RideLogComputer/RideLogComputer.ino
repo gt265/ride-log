@@ -1,19 +1,22 @@
 /*
-  Ride Log bike computer: firmware for the prototype in hardware/README.md
-  Board:  Seeed Studio XIAO ESP32-S3  (Arduino IDE: "XIAO_ESP32S3", PSRAM: "OPI PSRAM")
-  Needs these libraries (Arduino IDE → Library Manager):
-    Adafruit SHARP Memory Display, Adafruit GFX Library, Adafruit GPS Library,
-    Adafruit BMP3XX Library, NimBLE-Arduino (version 1.4.x)
+  Ride Log bike computer: firmware (Seeed XIAO ESP32-S3)
+  Pick your hardware at the top of config.h:
+    HW_V1_ALIEXPRESS  Waveshare 2.9" e-paper (296x128) + ATGM336H GPS (UART) + BMP280 + power switch
+    HW_ADAFRUIT       Adafruit Sharp 2.7" memory LCD (400x240) + PA1010D GPS (I2C) + BMP390
+
+  Arduino IDE: board "XIAO_ESP32S3", PSRAM "OPI PSRAM". Libraries (Library Manager):
+    Adafruit GFX Library, Adafruit GPS Library, NimBLE-Arduino (version 1.4.x), and
+    v1:       GxEPD2, Adafruit BMP280 Library
+    Adafruit: Adafruit SHARP Memory Display, Adafruit BMP3XX Library
 
   Buttons
     START  short: start / pause / resume        long (2 s): finish and save the ride
     LAP    short: new lap
-    PAGE   short: next screen                   long (3 s): sleep (wake with PAGE)
+    PAGE   short: next screen                   long (3 s): v1: full screen refresh / Adafruit: sleep
     On the "Device" screen with no ride running, hold START to switch Wi-Fi transfer on/off.
 
-  Rides are saved in the board's flash as Ride Log JSON. To copy them to the app:
-  turn on Wi-Fi transfer, join the "RideLog-xxxx" Wi-Fi network on your phone, open
-  http://192.168.4.1 and tap Download. Then in Ride Log: Settings → Import → pick the file.
+  Copy rides to the app: Wi-Fi transfer on → join "RideLog-xxxx" on your phone → open
+  http://192.168.4.1 → Download → in Ride Log: Settings → Import.
 */
 #include <Arduino.h>
 #include <Wire.h>
@@ -22,9 +25,7 @@
 #include <WiFi.h>
 #include <WebServer.h>
 #include <Adafruit_GFX.h>
-#include <Adafruit_SharpMem.h>
 #include <Adafruit_GPS.h>
-#include <Adafruit_BMP3XX.h>
 #include <NimBLEDevice.h>
 #include <Fonts/FreeSansBold24pt7b.h>
 #include <Fonts/FreeSansBold18pt7b.h>
@@ -33,16 +34,28 @@
 #include "config.h"
 #include "ride_logic.h"
 
-#ifndef UTC_OFFSET_MIN
-#define UTC_OFFSET_MIN 0      // your time zone in minutes (e.g. 60 for CET), used for ride dates/names
+#if defined(HW_V1_ALIEXPRESS)
+  #include <GxEPD2_BW.h>
+  #include <Adafruit_BMP280.h>
+  // Waveshare 2.9" e-Paper Module V2 (SSD1680). If the picture is blank or garbled, try GxEPD2_290_BS.
+  GxEPD2_BW<GxEPD2_290_T94_V2, GxEPD2_290_T94_V2::HEIGHT> display(GxEPD2_290_T94_V2(PIN_EPD_CS, PIN_EPD_DC, PIN_EPD_RST, PIN_EPD_BUSY));
+  static const uint16_t INK = GxEPD_BLACK, PAPER = GxEPD_WHITE;
+  Adafruit_GPS GPS(&Serial1);
+  Adafruit_BMP280 baro;
+  #define SCREEN_W 296
+  #define SCREEN_H 128
+#else
+  #include <Adafruit_SharpMem.h>
+  #include <Adafruit_BMP3XX.h>
+  Adafruit_SharpMem display(&SPI, PIN_DISP_CS, 400, 240, 2000000);
+  static const uint16_t INK = 0, PAPER = 1;          // Sharp memory LCD: 0 = black, 1 = white
+  Adafruit_GPS GPS(&Wire);
+  Adafruit_BMP3XX baro;
+  #define SCREEN_W 400
+  #define SCREEN_H 240
 #endif
 
 using ridelog::Ride;
-static const uint8_t INK = 0, PAPER = 1;           // Sharp memory LCD: 0 = black, 1 = white
-
-Adafruit_SharpMem display(&SPI, PIN_DISP_CS, 400, 240, 2000000);
-Adafruit_GPS GPS(&Wire);
-Adafruit_BMP3XX baro;
 WebServer server(80);
 
 Ride ride;
@@ -57,7 +70,8 @@ char lastSaved[48] = "";
 // ============================================================ helpers
 void flash(const char* msg, uint32_t ms = 5000) { strncpy(flashMsg, msg, sizeof(flashMsg) - 1); flashUntil = millis() + ms; }
 
-int batteryPercent() {
+int batteryPercent() {   // -1 = can't measure on this hardware
+  if (PIN_BATT < 0) return -1;
   const float v = analogReadMilliVolts(PIN_BATT) * 2 / 1000.0f;   // 220k/220k divider
   return constrain(int((v - 3.30f) / (4.20f - 3.30f) * 100), 0, 100);
 }
@@ -78,6 +92,36 @@ long daysFromCivil(int y, unsigned m, unsigned d) {
 long nowEpoch() {   // from the GPS clock (UTC)
   if (GPS.year == 0) return 0;
   return daysFromCivil(2000 + GPS.year, GPS.month, GPS.day) * 86400L + GPS.hour * 3600L + GPS.minute * 60L + GPS.seconds;
+}
+
+// ============================================================ buttons (interrupt-driven, so presses aren't missed
+// while the e-paper is busy refreshing)
+struct Button {
+  uint8_t pin; uint32_t longMs;
+  volatile bool down = false, longDone = false, pendingShort = false, pendingLong = false;
+  volatile uint32_t downAt = 0, upAt = 0;
+};
+Button bLap{PIN_BTN_LAP, 100000}, bStart{PIN_BTN_START, 2000}, bPage{PIN_BTN_PAGE, 3000};
+void IRAM_ATTR edge(Button& b) {
+  const bool pressed = digitalRead(b.pin) == LOW; const uint32_t t = millis();
+  if (pressed && !b.down && t - b.upAt > 30) { b.down = true; b.downAt = t; b.longDone = false; }
+  else if (!pressed && b.down && t - b.downAt > 30) {
+    b.down = false; b.upAt = t;
+    if (!b.longDone) { if (t - b.downAt >= b.longMs) b.pendingLong = true; else b.pendingShort = true; }
+  }
+}
+void IRAM_ATTR isrLap() { edge(bLap); }
+void IRAM_ATTR isrStart() { edge(bStart); }
+void IRAM_ATTR isrPage() { edge(bPage); }
+bool redrawNow = false;   // set by any button press so the screen answers straight away
+/** 0 = nothing, 1 = short press, 2 = long press */
+int takePress(Button& b) {
+  int r = 0;
+  if (b.down && !b.longDone && millis() - b.downAt >= b.longMs) { b.longDone = true; r = 2; }   // fires while held
+  else if (b.pendingLong) { b.pendingLong = false; r = 2; }
+  else if (b.pendingShort) { b.pendingShort = false; r = 1; }
+  if (r) redrawNow = true;
+  return r;
 }
 
 // ============================================================ Bluetooth sensors (heart rate, power, cadence)
@@ -147,12 +191,11 @@ void serviceSensors() {
       NimBLERemoteCharacteristic* chr = svc ? svc->getCharacteristic(s->chr) : nullptr;
       if (chr && chr->canNotify()) {
         chr->subscribe(true, s == &sHr ? onHr : s == &sPw ? onPower : onCsc);
-        char m[40]; snprintf(m, sizeof m, "%s sensor connected", s->label); flash(m, 3000);
+        char m[40]; snprintf(m, sizeof m, "%s connected", s->label); flash(m, 3000);
       } else s->client->disconnect();
     }
     delete dev;
   }
-  // keep looking for missing sensors (also reconnects after a drop)
   const bool missing = !sHr.connected() || !sPw.connected() || !sCad.connected();
   if (missing && millis() - lastScan > 20000 && !NimBLEDevice::getScan()->isScanning()) {
     lastScan = millis(); NimBLEDevice::getScan()->start(6, nullptr, false);
@@ -169,7 +212,6 @@ String jsonEscape(const std::string& s) {
 bool saveRide() {
   const long epoch = nowEpoch() + UTC_OFFSET_MIN * 60L;
   const long day = epoch > 0 ? epoch / 86400 : 0;
-  // civil date from days (inverse of daysFromCivil)
   long z = day + 719468, era = (z >= 0 ? z : z - 146096) / 146097; unsigned doe = unsigned(z - era * 146097);
   unsigned yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365; int y = int(yoe) + era * 400;
   unsigned doy = doe - (365 * yoe + yoe / 4 - yoe / 100), mp = (5 * doy + 2) / 153, d = doy - (153 * mp + 2) / 5 + 1, m = mp < 10 ? mp + 3 : mp - 9;
@@ -240,61 +282,66 @@ void handleClear() {
   for (auto& n : names) LittleFS.remove(n);
   server.sendHeader("Location", "/"); server.send(303);
 }
+void apName(char* out, size_t n) { snprintf(out, n, "RideLog-%04X", unsigned(ESP.getEfuseMac() & 0xffff)); }
 void setWifi(bool on) {
   if (on == wifiOn) return;
   wifiOn = on;
   if (on) {
-    char ssid[24]; snprintf(ssid, sizeof ssid, "RideLog-%04X", unsigned(ESP.getEfuseMac() & 0xffff));
+    char ssid[24]; apName(ssid, sizeof ssid);
     WiFi.mode(WIFI_AP); WiFi.softAP(ssid, AP_PASSWORD);
     server.on("/", handleRoot); server.on("/rides.json", handleRidesJson); server.on("/clear", HTTP_POST, handleClear);
     server.begin(); flash("Wi-Fi transfer on", 3000);
   } else { server.stop(); WiFi.softAPdisconnect(true); WiFi.mode(WIFI_OFF); flash("Wi-Fi transfer off", 3000); }
 }
 
-// ============================================================ drawing
-void textAt(const GFXfont* font, const String& s, int x, int y, uint8_t align = 0, uint8_t color = INK) {   // align 0=left 1=centre 2=right; y = baseline
+// ============================================================ drawing (works on both screens via Adafruit_GFX)
+void textAt(const GFXfont* font, const String& s, int x, int y, uint8_t align = 0, uint16_t color = INK) {   // align 0=left 1=centre 2=right; y = baseline
   display.setFont(font); display.setTextColor(color);
   int16_t x1, y1; uint16_t w, h; display.getTextBounds(s, 0, 0, &x1, &y1, &w, &h);
   display.setCursor(align == 1 ? x - int(w) / 2 - x1 : align == 2 ? x - int(w) - x1 : x, y); display.print(s);
 }
-void field(int x, int y, int w, int h, const char* label, const String& value, const char* unit = "") {
-  display.drawRoundRect(x, y, w, h, 8, INK);
-  textAt(&FreeSans9pt7b, label, x + 8, y + 17);
-  textAt(&FreeSansBold18pt7b, value, x + w - 8 - (strlen(unit) ? 30 : 0), y + h - 10, 2);
-  if (strlen(unit)) textAt(&FreeSans9pt7b, unit, x + w - 6, y + h - 12, 2);
+/** A labelled box. Big = 18pt value (Sharp), otherwise 12pt (e-paper). */
+void field(int x, int y, int w, int h, const char* label, const String& value, const char* unit = "", bool big = SCREEN_W > 300) {
+  display.drawRoundRect(x, y, w, h, 6, INK);
+  textAt(&FreeSans9pt7b, label, x + 6, y + 14);
+  const int unitW = strlen(unit) ? (big ? 30 : 26) : 0;
+  textAt(big ? &FreeSansBold18pt7b : &FreeSansBold12pt7b, value, x + w - 6 - unitW, y + h - (big ? 10 : 6), 2);
+  if (unitW) textAt(&FreeSans9pt7b, unit, x + w - 4, y + h - (big ? 12 : 7), 2);
 }
 String orDash(int v) { return v >= 0 ? String(v) : String("--"); }
 
 void drawTopBar() {
-  display.fillRect(0, 0, 400, 22, INK);
-  const char* st = ride.status == Ride::RUNNING ? (ride.autoPaused ? "AUTO-PAUSED" : "REC") : ride.status == Ride::PAUSED ? "PAUSED" : ride.status == Ride::FINISHED ? "SAVED" : "READY";
-  textAt(&FreeSans9pt7b, st, 6, 16, 0, PAPER);
-  char gps[24]; snprintf(gps, sizeof gps, gpsFix ? "GPS %d" : "GPS ...", sats);
-  textAt(&FreeSans9pt7b, gps, 200, 16, 1, PAPER);
-  String right = String(batteryPercent()) + "%";
-  if (GPS.year) { char t[8]; long e = nowEpoch() + UTC_OFFSET_MIN * 60L; snprintf(t, sizeof t, "%02ld:%02ld", e % 86400 / 3600, e % 3600 / 60); right = String(t) + "  " + right; }
-  textAt(&FreeSans9pt7b, right, 394, 16, 2, PAPER);
-  int x = 92; for (Sensor* s : sensors) if (s->connected()) { textAt(&FreeSans9pt7b, s->label, x, 16, 0, PAPER); x += 38; }
+  const int bh = SCREEN_H > 200 ? 22 : 17;
+  display.fillRect(0, 0, SCREEN_W, bh, INK);
+  const char* st = ride.status == Ride::RUNNING ? (ride.autoPaused ? "AUTO-PAUSE" : "REC") : ride.status == Ride::PAUSED ? "PAUSED" : ride.status == Ride::FINISHED ? "SAVED" : "READY";
+  textAt(&FreeSans9pt7b, st, 4, bh - 4, 0, PAPER);
+  char gps[16]; snprintf(gps, sizeof gps, gpsFix ? "GPS %d" : "GPS ..", sats);
+  textAt(&FreeSans9pt7b, gps, SCREEN_W / 2 + 10, bh - 4, 1, PAPER);
+  String right; const int bat = batteryPercent();
+  if (GPS.year) { char t[8]; long e = nowEpoch() + UTC_OFFSET_MIN * 60L; snprintf(t, sizeof t, "%02ld:%02ld", e % 86400 / 3600, e % 3600 / 60); right = t; }
+  if (bat >= 0) right += (right.length() ? "  " : "") + String(bat) + "%";
+  textAt(&FreeSans9pt7b, right, SCREEN_W - 4, bh - 4, 2, PAPER);
+  if (SCREEN_W > 300) { int x = 110; for (Sensor* s : sensors) if (s->connected()) { textAt(&FreeSans9pt7b, s->label, x, bh - 4, 0, PAPER); x += 38; } }
 }
 
-void drawPage() {
-  display.clearDisplay();
-  drawTopBar();
+void drawPageContents() {
   const uint32_t now = millis();
+  const double kmh = (ride.status == Ride::RUNNING && now - lastFixMs < 6000) ? ride.speed * 3.6 : 0;
+  const double avg = ride.avgSpeed();
+  const char* trend = (ride.status == Ride::RUNNING && avg > 0 && ride.moving > 30 && ride.speed > 0.5)
+                        ? (ride.speed > avg * 1.03 ? "+avg" : ride.speed < avg * .97 ? "-avg" : "=avg") : "";
+  const int hr = sHr.get(), pw = power3s(), cad = cadenceNow();
+  const int hz = ridelog::hrZone(hr, MAX_HR), pz = ridelog::powerZone(pw, FTP_WATTS);
+#if SCREEN_W > 300
+  // ---------------- Sharp 400 x 240 ----------------
   if (page == PAGE_RIDE) {
-    const double kmh = (ride.status == Ride::RUNNING && now - lastFixMs < 6000) ? ride.speed * 3.6 : 0;
     display.setTextSize(2); textAt(&FreeSansBold24pt7b, String(kmh, 1), 300, 112, 2); display.setTextSize(1);
-    textAt(&FreeSans9pt7b, "km/h", 310, 112);
-    const double avg = ride.avgSpeed();
-    if (ride.status == Ride::RUNNING && avg > 0 && ride.moving > 30 && ride.speed > 0.5)
-      textAt(&FreeSans9pt7b, ride.speed > avg * 1.03 ? "+ avg" : ride.speed < avg * .97 ? "- avg" : "= avg", 310, 90);
+    textAt(&FreeSans9pt7b, "km/h", 310, 112); textAt(&FreeSans9pt7b, trend, 310, 90);
     field(4, 124, 194, 54, "Distance", String(ride.dist / 1000, 2), "km");
     field(202, 124, 194, 54, "Moving", fmtTime(ride.moving));
     field(4, 182, 194, 54, "Avg speed", String(avg * 3.6, 1), "km/h");
     field(202, 182, 194, 54, "Climbing", String(lround(ride.elev)), "m");
   } else if (page == PAGE_SENSORS) {
-    const int hr = sHr.get(), pw = power3s(), cad = cadenceNow();
-    const int hz = ridelog::hrZone(hr, MAX_HR), pz = ridelog::powerZone(pw, FTP_WATTS);
     field(4, 28, 194, 100, "Heart rate", orDash(hr), "bpm");
     field(202, 28, 194, 100, "Power 3s", orDash(pw), "W");
     field(4, 132, 128, 104, "HR zone", hz ? "Z" + String(hz) : String("--"));
@@ -308,52 +355,88 @@ void drawPage() {
       field(4, 132, 194, 104, ("Lap " + String(l.n)).c_str(), fmtTime(l.t));
       field(202, 132, 194, 104, "Lap km/h", String(l.t ? l.d / double(l.t) * 3.6 : 0, 1));
     } else textAt(&FreeSans9pt7b, "Press LAP to start a new lap", 200, 190, 1);
-  } else {
-    textAt(&FreeSansBold12pt7b, "Device", 12, 52);
-    char b[64];
-    snprintf(b, sizeof b, "Rides saved: %d", rideCount()); textAt(&FreeSans9pt7b, b, 12, 82);
-    snprintf(b, sizeof b, "Last: %s", lastSaved[0] ? lastSaved : "-"); textAt(&FreeSans9pt7b, b, 12, 104);
-    snprintf(b, sizeof b, "Battery %d%%   GPS %s   Baro %s", batteryPercent(), gpsFix ? "fix" : "searching", baroOk ? "ok" : "missing"); textAt(&FreeSans9pt7b, b, 12, 126);
+  }
+#else
+  // ---------------- e-paper 296 x 128 ----------------
+  if (page == PAGE_RIDE) {
+    display.setTextSize(2); textAt(&FreeSansBold18pt7b, String(kmh, kmh >= 100 ? 0 : 1), 170, 96, 2); display.setTextSize(1);   // ~50 px tall digits
+    textAt(&FreeSans9pt7b, "km/h", 8, 120); textAt(&FreeSans9pt7b, trend, 172, 120, 2);
+    field(178, 19, 116, 35, "Dist km", String(ride.dist / 1000, 2));
+    field(178, 56, 116, 35, "Moving", fmtTime(ride.moving));
+    field(178, 93, 116, 35, "Avg km/h", String(avg * 3.6, 1));
+  } else if (page == PAGE_SENSORS) {
+    field(2, 19, 145, 53, "Heart rate", orDash(hr), "bpm");
+    field(149, 19, 145, 53, "Power 3s", orDash(pw), "W");
+    field(2, 74, 96, 53, "HR zone", hz ? "Z" + String(hz) : String("--"));
+    field(100, 74, 96, 53, "Pwr zone", pz ? "Z" + String(pz) : String("--"));
+    field(198, 74, 96, 53, "Cadence", orDash(cad));
+  } else if (page == PAGE_LAPS) {
+    field(2, 19, 145, 53, "Lap time", fmtTime(ride.lapTime()));
+    field(149, 19, 145, 53, "Lap dist", String(ride.lapDist() / 1000, 2), "km");
+    if (!ride.laps.empty()) {
+      const auto& l = ride.laps.back();
+      field(2, 74, 145, 53, ("Lap " + String(l.n)).c_str(), fmtTime(l.t));
+      field(149, 74, 145, 53, "Lap km/h", String(l.t ? l.d / double(l.t) * 3.6 : 0, 1));
+    } else textAt(&FreeSans9pt7b, "Press LAP for a new lap", 148, 104, 1);
+  }
+#endif
+  if (page == PAGE_DEVICE) {
+    const int lh = SCREEN_H > 200 ? 22 : 17; int y = SCREEN_H > 200 ? 52 : 36;
+    char b[72];
+    textAt(&FreeSansBold12pt7b, "Device", 6, y); y += lh + 2;
+    snprintf(b, sizeof b, "Rides saved: %d   Climb: %ld m", rideCount(), lround(ride.elev)); textAt(&FreeSans9pt7b, b, 6, y); y += lh;
+    snprintf(b, sizeof b, "Last: %s", lastSaved[0] ? lastSaved : "-"); textAt(&FreeSans9pt7b, b, 6, y); y += lh;
+    snprintf(b, sizeof b, "GPS %s  Baro %s", gpsFix ? "fix" : "searching", baroOk ? "ok" : "missing"); textAt(&FreeSans9pt7b, b, 6, y); y += lh;
     if (wifiOn) {
-      char ssid[24]; snprintf(ssid, sizeof ssid, "RideLog-%04X", unsigned(ESP.getEfuseMac() & 0xffff));
-      textAt(&FreeSansBold12pt7b, "Wi-Fi transfer ON", 12, 160);
-      snprintf(b, sizeof b, "Join %s  (password %s)", ssid, AP_PASSWORD); textAt(&FreeSans9pt7b, b, 12, 184);
-      textAt(&FreeSans9pt7b, "then open http://192.168.4.1", 12, 206);
-    } else textAt(&FreeSans9pt7b, "Hold START to send rides to your phone", 12, 170);
+      char ssid[24]; apName(ssid, sizeof ssid);
+      snprintf(b, sizeof b, "Wi-Fi %s / %s", ssid, AP_PASSWORD); textAt(&FreeSans9pt7b, b, 6, y); y += lh;
+      textAt(&FreeSans9pt7b, "open http://192.168.4.1", 6, y);
+    } else textAt(&FreeSans9pt7b, "Hold START: send rides to phone", 6, y);
   }
-  if (now < flashUntil) {   // message banner
-    display.fillRoundRect(20, 92, 360, 56, 10, INK);
-    textAt(&FreeSansBold12pt7b, flashMsg, 200, 128, 1, PAPER);
+  if (millis() < flashUntil) {   // message banner
+    const int bw = SCREEN_W - 24, bh = SCREEN_H > 200 ? 56 : 40, by = (SCREEN_H - bh) / 2 + 8;
+    display.fillRoundRect(12, by, bw, bh, 8, INK);
+    textAt(SCREEN_H > 200 ? &FreeSansBold12pt7b : &FreeSans9pt7b, flashMsg, SCREEN_W / 2, by + bh / 2 + 6, 1, PAPER);
   }
-  display.refresh();
 }
 
-// ============================================================ buttons
-struct Button { uint8_t pin; bool down = false; uint32_t since = 0; bool longDone = false; };
-Button bLap{PIN_BTN_LAP}, bStart{PIN_BTN_START}, bPage{PIN_BTN_PAGE};
-/** 0 = nothing, 1 = short press (on release), 2 = long press (fires while held) */
-int poll(Button& b, uint32_t longMs) {
-  const bool pressed = digitalRead(b.pin) == LOW; const uint32_t now = millis();
-  if (pressed && !b.down) { b.down = true; b.since = now; b.longDone = false; return 0; }
-  if (pressed && b.down && !b.longDone && now - b.since >= longMs) { b.longDone = true; return 2; }
-  if (!pressed && b.down) { b.down = false; if (!b.longDone && now - b.since >= 30) return 1; }
-  return 0;
+#if defined(HW_V1_ALIEXPRESS)
+uint32_t lastFullRefresh = 0; bool forceFull = true;
+void drawPage() {
+  // e-paper: fast partial updates; a full refresh every 3 minutes clears the faint "ghost" of old digits
+  const bool full = forceFull || millis() - lastFullRefresh > 180000;
+  if (full) { display.setFullWindow(); lastFullRefresh = millis(); forceFull = false; }
+  else display.setPartialWindow(0, 0, display.width(), display.height());
+  display.firstPage();
+  do { display.fillScreen(PAPER); drawTopBar(); drawPageContents(); } while (display.nextPage());
+}
+#else
+void drawPage() { display.clearDisplay(); drawTopBar(); drawPageContents(); display.refresh(); }
+#endif
+
+void splash(const char* line) {
+#if defined(HW_V1_ALIEXPRESS)
+  display.setFullWindow(); display.firstPage();
+  do { display.fillScreen(PAPER); textAt(&FreeSansBold18pt7b, "Ride Log", SCREEN_W / 2, 60, 1); textAt(&FreeSans9pt7b, line, SCREEN_W / 2, 92, 1); } while (display.nextPage());
+#else
+  display.clearDisplay(); textAt(&FreeSansBold18pt7b, "Ride Log", SCREEN_W / 2, 110, 1); textAt(&FreeSans9pt7b, line, SCREEN_W / 2, 145, 1); display.refresh();
+#endif
 }
 
+#if defined(HW_ADAFRUIT)
 void goToSleep() {
-  display.clearDisplay();
-  textAt(&FreeSansBold18pt7b, "Ride Log", 200, 110, 1);
-  textAt(&FreeSans9pt7b, "Sleeping - press PAGE to wake", 200, 145, 1);
-  display.refresh();
+  splash("Sleeping - press PAGE to wake");
   setWifi(false); GPS.standby(); NimBLEDevice::deinit(true);
   while (digitalRead(PIN_BTN_PAGE) == LOW) delay(10);       // wait for release
   esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_BTN_PAGE, 0);
   esp_deep_sleep_start();
 }
+#endif
 
+// ============================================================ button actions
 void handleButtons() {
   const uint32_t now = millis();
-  switch (poll(bStart, 2000)) {
+  switch (takePress(bStart)) {
     case 1:
       if (ride.status == Ride::IDLE || ride.status == Ride::FINISHED) {
         ride.autoPauseOn = AUTO_PAUSE; ride.autoLapKm = AUTO_LAP_KM; ride.start(now);
@@ -369,14 +452,18 @@ void handleButtons() {
       } else if (page == PAGE_DEVICE) setWifi(!wifiOn);
       break;
   }
-  if (poll(bLap, 100000) == 1) {
+  if (takePress(bLap) == 1) {
     if (ride.lap()) { const auto& l = ride.laps.back(); char m[48]; snprintf(m, sizeof m, "Lap %u  %s", unsigned(l.n), fmtTime(l.t).c_str()); flash(m); }
   }
-  switch (poll(bPage, 3000)) {
+  switch (takePress(bPage)) {
     case 1: page = (page + 1) % PAGE_COUNT; break;
     case 2:
+#if defined(HW_V1_ALIEXPRESS)
+      forceFull = true;                                       // v1 turns off with the power switch
+#else
       if (ride.status == Ride::RUNNING || ride.status == Ride::PAUSED) flash("Finish the ride first");
       else goToSleep();
+#endif
       break;
   }
 }
@@ -385,13 +472,31 @@ void handleButtons() {
 void setup() {
   Serial.begin(115200);
   pinMode(PIN_BTN_LAP, INPUT_PULLUP); pinMode(PIN_BTN_START, INPUT_PULLUP); pinMode(PIN_BTN_PAGE, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(PIN_BTN_LAP), isrLap, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(PIN_BTN_START), isrStart, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(PIN_BTN_PAGE), isrPage, CHANGE);
   analogReadResolution(12);
+
+#if defined(HW_V1_ALIEXPRESS)
+  SPI.begin(PIN_EPD_SCK, -1, PIN_EPD_MOSI, PIN_EPD_CS);      // no MISO: D9 is the e-paper BUSY pin
+  display.init(0, true, 2, false);
+  display.setRotation(1);                                   // landscape, 296 x 128
+#else
   SPI.begin(PIN_DISP_SCK, -1, PIN_DISP_MOSI);
-  display.begin(); display.setRotation(0); display.clearDisplay();
-  textAt(&FreeSansBold18pt7b, "Ride Log", 200, 110, 1); textAt(&FreeSans9pt7b, "Starting...", 200, 145, 1); display.refresh();
+  display.begin(); display.setRotation(0);
+#endif
+  splash("Starting...");
 
   if (!LittleFS.begin(true)) Serial.println("LittleFS failed");
   Wire.begin(); Wire.setClock(400000);
+#if defined(HW_V1_ALIEXPRESS)
+  Serial1.setRxBufferSize(2048);                            // the e-paper refresh blocks for ~0.6 s; keep GPS data meanwhile
+  GPS.begin(GPS_BAUD);
+  Serial1.begin(GPS_BAUD, SERIAL_8N1, PIN_GPS_RX, -1);      // receive only: the GPS sends NMEA at 1 Hz by default
+  baroOk = baro.begin(BARO_I2C_ADDR);
+  if (baroOk) baro.setSampling(Adafruit_BMP280::MODE_NORMAL, Adafruit_BMP280::SAMPLING_X2, Adafruit_BMP280::SAMPLING_X16,
+                               Adafruit_BMP280::FILTER_X16, Adafruit_BMP280::STANDBY_MS_63);
+#else
   GPS.begin(GPS_I2C_ADDR);
   GPS.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCGGA);
   GPS.sendCommand(PMTK_SET_NMEA_UPDATE_1HZ);
@@ -403,6 +508,7 @@ void setup() {
     baro.setIIRFilterCoeff(BMP3_IIR_FILTER_COEFF_3);
     baro.setOutputDataRate(BMP3_ODR_25_HZ);
   }
+#endif
   NimBLEDevice::init("");
   NimBLEScan* scan = NimBLEDevice::getScan();
   scan->setAdvertisedDeviceCallbacks(new ScanCallbacks(), false);
@@ -412,8 +518,8 @@ void setup() {
 
 uint32_t lastDraw = 0, lastSecond = 0, lastBaro = 0;
 void loop() {
-  // GPS: read everything waiting on I2C, handle each new sentence
-  for (int i = 0; i < 128; i++) GPS.read();
+  // GPS: read everything waiting, handle each new sentence
+  for (int i = 0; i < 512; i++) GPS.read();
   if (GPS.newNMEAreceived() && GPS.parse(GPS.lastNMEA())) {
     gpsFix = GPS.fix; sats = GPS.satellites; gpsAccuracy = GPS.HDOP > 0 ? GPS.HDOP * 5.0 : 99;   // rough: HDOP x 5 m
     if (gpsFix && strstr(GPS.lastNMEA(), "RMC")) {
@@ -429,6 +535,11 @@ void loop() {
   handleButtons();
   serviceSensors();
   if (wifiOn) server.handleClient();
-  if (now - lastDraw >= 500) { lastDraw = now; drawPage(); }   // the Sharp display also needs refreshing at least once a second
+#if defined(HW_V1_ALIEXPRESS)
+  const uint32_t every = ride.status == Ride::RUNNING ? 1000 : 4000;   // e-paper: once a second while riding
+#else
+  const uint32_t every = 500;                                          // Sharp: also needs refreshing at least once a second
+#endif
+  if (now - lastDraw >= every || redrawNow) { lastDraw = now; redrawNow = false; drawPage(); }
   delay(5);
 }
