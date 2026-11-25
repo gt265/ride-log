@@ -55,17 +55,34 @@ It saves rides in the board's memory in Ride Log's own format, so they import in
   3. Open **http://192.168.4.1** and tap **Download rides**.
   4. In the Ride Log app, go to **Settings → Import** and pick the downloaded file. The rides then sync to your account like any other ride.
 
+## Try it without hardware: the simulator
+Open [`../simulator/index.html`](../simulator/index.html) in a browser. It runs the v1 firmware's logic and screens in a browser:
+- **Same ride maths.** It uses a JavaScript copy of `ride_logic.h`, and `test/compare_ports.sh` checks it gives identical numbers to the C++.
+- **Same screen.** It draws the screen with the device's own fonts at 296 × 128 pixels.
+- **Same behaviour:** buttons, pages, Bluetooth scanning, e-paper refresh rules and the Wi-Fi export.
+
+To rebuild it after changing `sim_src.html` or `ride_logic.js`:
+
+```bash
+python3 ../simulator/build.py
+```
+
 ## Test the ride maths on a computer
 
 ```bash
 cd test && g++ -std=c++17 ride_logic_test.cpp -o ride_logic_test && ./ride_logic_test
 ```
 
+```bash
+bash test/compare_ports.sh
+```
+
 ## Status: please read
 - **Tested:**
   - the ride maths (`ride_logic.h`) passes all tests, with the same results as the app on the same simulated ride;
   - a ride file in the device's format imports into Ride Log with its route, laps and sensor data;
-  - the main program compiles without errors against stand-ins for the libraries, in **both** hardware versions.
+  - the main program compiles without errors against stand-ins for the libraries, in **both** hardware versions;
+  - the v1 screens were checked pixel by pixel in the simulator. That caught and fixed overlapping labels on the 296 × 128 screen, and a quick-tap bug that could turn a short START press into "finish ride".
 - **Not tested yet:** it hasn't been compiled with the real ESP32 tools or run on hardware, because the build tools couldn't be downloaded in the environment it was written in. Expect a few small fixes on first compile or first run. Copy any error messages from the Arduino IDE and send them over.
 - **e-paper driver:** if the v1 screen stays blank or shows noise, the module may need a different driver. In `RideLogComputer.ino`, change `GxEPD2_290_T94_V2` to `GxEPD2_290_BS` (both places).
 - **Not in this version:**

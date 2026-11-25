@@ -116,6 +116,11 @@ void IRAM_ATTR isrPage() { edge(bPage); }
 bool redrawNow = false;   // set by any button press so the screen answers straight away
 /** 0 = nothing, 1 = short press, 2 = long press */
 int takePress(Button& b) {
+  // A tap shorter than the 30 ms debounce leaves "down" set with no release edge; catch it here
+  // so it can't turn into a phantom long press (which on START would finish the ride).
+  if (b.down && digitalRead(b.pin) == HIGH && millis() - b.downAt > 50) {
+    noInterrupts(); b.down = false; b.upAt = millis(); if (!b.longDone) b.pendingShort = true; interrupts();
+  }
   int r = 0;
   if (b.down && !b.longDone && millis() - b.downAt >= b.longMs) { b.longDone = true; r = 2; }   // fires while held
   else if (b.pendingLong) { b.pendingLong = false; r = 2; }
@@ -300,18 +305,48 @@ void textAt(const GFXfont* font, const String& s, int x, int y, uint8_t align = 
   int16_t x1, y1; uint16_t w, h; display.getTextBounds(s, 0, 0, &x1, &y1, &w, &h);
   display.setCursor(align == 1 ? x - int(w) / 2 - x1 : align == 2 ? x - int(w) - x1 : x, y); display.print(s);
 }
-/** A labelled box. Big = 18pt value (Sharp), otherwise 12pt (e-paper). */
-void field(int x, int y, int w, int h, const char* label, const String& value, const char* unit = "", bool big = SCREEN_W > 300) {
-  display.drawRoundRect(x, y, w, h, 6, INK);
-  textAt(&FreeSans9pt7b, label, x + 6, y + 14);
-  const int unitW = strlen(unit) ? (big ? 30 : 26) : 0;
-  textAt(big ? &FreeSansBold18pt7b : &FreeSansBold12pt7b, value, x + w - 6 - unitW, y + h - (big ? 10 : 6), 2);
-  if (unitW) textAt(&FreeSans9pt7b, unit, x + w - 4, y + h - (big ? 12 : 7), 2);
+/** Small text in the library's built-in 5x7 font. y = TOP of the text (not the baseline). */
+void smallAt(const String& s, int x, int y, uint8_t align = 0, uint16_t color = INK) {
+  display.setFont(); display.setTextSize(1); display.setTextColor(color);
+  const int w = int(s.length()) * 6 - 1;
+  display.setCursor(align == 1 ? x - w / 2 : align == 2 ? x - w : x, y); display.print(s);
 }
+#if SCREEN_W > 300
+/** A labelled box (Sharp 400x240): 9pt label, 18pt value, optional unit. */
+void field(int x, int y, int w, int h, const char* label, const String& value, const char* unit = "") {
+  display.drawRoundRect(x, y, w, h, 6, INK);
+  textAt(&FreeSans9pt7b, label, x + 6, y + 17);
+  const int unitW = strlen(unit) ? 30 : 0;
+  textAt(&FreeSansBold18pt7b, value, x + w - 6 - unitW, y + h - 10, 2);
+  if (unitW) textAt(&FreeSans9pt7b, unit, x + w - 4, y + h - 12, 2);
+}
+#else
+/** A labelled box (e-paper 296x128): small label top-left, value bottom-right. */
+void field(int x, int y, int w, int h, const char* label, const String& value, const GFXfont* font = &FreeSansBold12pt7b) {
+  display.drawRoundRect(x, y, w, h, 5, INK);
+  smallAt(label, x + 5, y + 4);
+  textAt(font, value, x + w - 5, y + h - (font == &FreeSansBold18pt7b ? 7 : 6), 2);
+}
+#endif
 String orDash(int v) { return v >= 0 ? String(v) : String("--"); }
 
 void drawTopBar() {
-  const int bh = SCREEN_H > 200 ? 22 : 17;
+#if SCREEN_W <= 300
+  {   // e-paper: a slim 12 px bar in the small font
+    const int bh = 12;
+    display.fillRect(0, 0, SCREEN_W, bh, INK);
+    const char* st = ride.status == Ride::RUNNING ? (ride.autoPaused ? "AUTO-PAUSE" : "REC") : ride.status == Ride::PAUSED ? "PAUSED" : ride.status == Ride::FINISHED ? "SAVED" : "READY";
+    smallAt(st, 3, 2, 0, PAPER);
+    char gps[16]; snprintf(gps, sizeof gps, gpsFix ? "GPS %d" : "GPS ...", sats);
+    smallAt(gps, SCREEN_W / 2, 2, 1, PAPER);
+    String hw;
+    for (Sensor* s : sensors) if (s->connected()) hw += String(hw.length() ? " " : "") + s->label;
+    if (hw.length()) smallAt(hw, SCREEN_W / 2 + 34, 2, 0, PAPER);
+    if (GPS.year) { char t[8]; long e = nowEpoch() + UTC_OFFSET_MIN * 60L; snprintf(t, sizeof t, "%02ld:%02ld", e % 86400 / 3600, e % 3600 / 60); smallAt(t, SCREEN_W - 3, 2, 2, PAPER); }
+    return;
+  }
+#endif
+  const int bh = 22;
   display.fillRect(0, 0, SCREEN_W, bh, INK);
   const char* st = ride.status == Ride::RUNNING ? (ride.autoPaused ? "AUTO-PAUSE" : "REC") : ride.status == Ride::PAUSED ? "PAUSED" : ride.status == Ride::FINISHED ? "SAVED" : "READY";
   textAt(&FreeSans9pt7b, st, 4, bh - 4, 0, PAPER);
@@ -359,29 +394,42 @@ void drawPageContents() {
 #else
   // ---------------- e-paper 296 x 128 ----------------
   if (page == PAGE_RIDE) {
-    display.setTextSize(2); textAt(&FreeSansBold18pt7b, String(kmh, kmh >= 100 ? 0 : 1), 170, 96, 2); display.setTextSize(1);   // ~50 px tall digits
-    textAt(&FreeSans9pt7b, "km/h", 8, 120); textAt(&FreeSans9pt7b, trend, 172, 120, 2);
-    field(178, 19, 116, 35, "Dist km", String(ride.dist / 1000, 2));
-    field(178, 56, 116, 35, "Moving", fmtTime(ride.moving));
-    field(178, 93, 116, 35, "Avg km/h", String(avg * 3.6, 1));
+    smallAt("SPEED", 6, 18);
+    display.setTextSize(2); textAt(&FreeSansBold18pt7b, String(kmh, kmh >= 100 ? 0 : 1), 170, 92, 2); display.setTextSize(1);   // ~50 px digits
+    smallAt("km/h", 6, 112); smallAt(trend, 170, 112, 2);
+    field(178, 14, 116, 38, "Distance km", String(ride.dist / 1000, 2));
+    field(178, 52, 116, 38, "Moving", fmtTime(ride.moving));
+    field(178, 90, 116, 38, "Avg km/h", String(avg * 3.6, 1));
   } else if (page == PAGE_SENSORS) {
-    field(2, 19, 145, 53, "Heart rate", orDash(hr), "bpm");
-    field(149, 19, 145, 53, "Power 3s", orDash(pw), "W");
-    field(2, 74, 96, 53, "HR zone", hz ? "Z" + String(hz) : String("--"));
-    field(100, 74, 96, 53, "Pwr zone", pz ? "Z" + String(pz) : String("--"));
-    field(198, 74, 96, 53, "Cadence", orDash(cad));
+    field(2, 14, 145, 56, "Heart rate bpm", orDash(hr), &FreeSansBold18pt7b);
+    field(149, 14, 145, 56, "Power 3s W", orDash(pw), &FreeSansBold18pt7b);
+    field(2, 72, 96, 56, "HR zone", hz ? "Z" + String(hz) : String("--"), &FreeSansBold18pt7b);
+    field(100, 72, 96, 56, "Power zone", pz ? "Z" + String(pz) : String("--"), &FreeSansBold18pt7b);
+    field(198, 72, 96, 56, "Cadence rpm", orDash(cad), &FreeSansBold18pt7b);
   } else if (page == PAGE_LAPS) {
-    field(2, 19, 145, 53, "Lap time", fmtTime(ride.lapTime()));
-    field(149, 19, 145, 53, "Lap dist", String(ride.lapDist() / 1000, 2), "km");
+    field(2, 14, 145, 56, "Lap time", fmtTime(ride.lapTime()));
+    field(149, 14, 145, 56, "Lap distance km", String(ride.lapDist() / 1000, 2), &FreeSansBold18pt7b);
     if (!ride.laps.empty()) {
       const auto& l = ride.laps.back();
-      field(2, 74, 145, 53, ("Lap " + String(l.n)).c_str(), fmtTime(l.t));
-      field(149, 74, 145, 53, "Lap km/h", String(l.t ? l.d / double(l.t) * 3.6 : 0, 1));
-    } else textAt(&FreeSans9pt7b, "Press LAP for a new lap", 148, 104, 1);
+      field(2, 72, 145, 56, ("Last lap (" + String(l.n) + ")").c_str(), fmtTime(l.t));
+      field(149, 72, 145, 56, "Last lap km/h", String(l.t ? l.d / double(l.t) * 3.6 : 0, 1), &FreeSansBold18pt7b);
+    } else smallAt("Press LAP to start a new lap", SCREEN_W / 2, 96, 1);
   }
 #endif
-  if (page == PAGE_DEVICE) {
-    const int lh = SCREEN_H > 200 ? 22 : 17; int y = SCREEN_H > 200 ? 52 : 36;
+  if (page == PAGE_DEVICE && SCREEN_W <= 300) {
+    char b[72]; int y = 44; const int lh = 13;
+    textAt(&FreeSansBold12pt7b, "Device", 6, 36);
+    snprintf(b, sizeof b, "Rides saved: %d", rideCount()); smallAt(b, 6, y); y += lh;
+    snprintf(b, sizeof b, "Last: %s", lastSaved[0] ? lastSaved : "-"); smallAt(b, 6, y); y += lh;
+    snprintf(b, sizeof b, "GPS %s   Barometer %s", gpsFix ? "fix" : "searching", baroOk ? "ok" : "MISSING"); smallAt(b, 6, y); y += lh;
+    if (wifiOn) {
+      char ssid[24]; apName(ssid, sizeof ssid);
+      snprintf(b, sizeof b, "Wi-Fi ON: join %s", ssid); smallAt(b, 6, y); y += lh;
+      snprintf(b, sizeof b, "password %s", AP_PASSWORD); smallAt(b, 6, y); y += lh;
+      smallAt("then open http://192.168.4.1", 6, y);
+    } else { smallAt("Hold START to send rides to your phone", 6, y); }
+  } else if (page == PAGE_DEVICE) {
+    const int lh = 22; int y = 52;
     char b[72];
     textAt(&FreeSansBold12pt7b, "Device", 6, y); y += lh + 2;
     snprintf(b, sizeof b, "Rides saved: %d   Climb: %ld m", rideCount(), lround(ride.elev)); textAt(&FreeSans9pt7b, b, 6, y); y += lh;
@@ -394,9 +442,9 @@ void drawPageContents() {
     } else textAt(&FreeSans9pt7b, "Hold START: send rides to phone", 6, y);
   }
   if (millis() < flashUntil) {   // message banner
-    const int bw = SCREEN_W - 24, bh = SCREEN_H > 200 ? 56 : 40, by = (SCREEN_H - bh) / 2 + 8;
+    const int bw = SCREEN_W - 24, bh = SCREEN_H > 200 ? 56 : 34, by = (SCREEN_H - bh) / 2 + (SCREEN_H > 200 ? 8 : 6);
     display.fillRoundRect(12, by, bw, bh, 8, INK);
-    textAt(SCREEN_H > 200 ? &FreeSansBold12pt7b : &FreeSans9pt7b, flashMsg, SCREEN_W / 2, by + bh / 2 + 6, 1, PAPER);
+    textAt(SCREEN_H > 200 ? &FreeSansBold12pt7b : &FreeSans9pt7b, flashMsg, SCREEN_W / 2, by + bh / 2 + (SCREEN_H > 200 ? 6 : 5), 1, PAPER);
   }
 }
 

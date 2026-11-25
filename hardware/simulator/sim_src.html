@@ -1,0 +1,780 @@
+<title>Ride Log Bike Computer Simulator</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a workbench. Left: the device itself (graphite case, e-paper screen, real buttons) and what's
+   happening inside it. Right: the "world" you control: the ride, the sensors, the settings, a phone. */
+:root {
+  --bg: #eceef0; --surface: #ffffff; --surface-2: #f4f5f6; --line: #dcdfe3; --ink: #15181b; --ink-2: #4d545c; --ink-3: #7f8790;
+  --accent: #2a78d6; --accent-ink: #1f63b5; --accent-soft: rgba(42,120,214,.1);
+  --good: #1b7f3b; --warn: #a86b00; --bad: #c93b3a;
+  --case: #23262b; --case-2: #2f3339; --case-edge: #3b4047; --btn: #16181b;
+  --paper: #dfe0d8; --epd-ink: #1e201d;
+  --display: "Space Grotesk", "Inter", system-ui, sans-serif; --body: "Inter", system-ui, -apple-system, sans-serif; --mono: "JetBrains Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f1113; --surface: #181b1e; --surface-2: #1f2327; --line: #2c3136; --ink: #eef0f2; --ink-2: #b5bcc4; --ink-3: #848c95;
+  --accent: #5b9ef0; --accent-ink: #8bbcf6; --accent-soft: rgba(91,158,240,.14); --good: #4cc46f; --warn: #e0a106; --bad: #ef6a6a;
+  --case: #2a2e34; --case-2: #353a41; --case-edge: #444a52; --btn: #101214; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0f1113; --surface: #181b1e; --surface-2: #1f2327; --line: #2c3136; --ink: #eef0f2; --ink-2: #b5bcc4; --ink-3: #848c95;
+  --accent: #5b9ef0; --accent-ink: #8bbcf6; --accent-soft: rgba(91,158,240,.14); --good: #4cc46f; --warn: #e0a106; --bad: #ef6a6a;
+  --case: #2a2e34; --case-2: #353a41; --case-edge: #444a52; --btn: #101214; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 var(--body); }
+.wrap { max-width: 1180px; margin: 0 auto; padding-block: 24px 48px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+header { margin-bottom: 18px; }
+header h1 { font-family: var(--display); font-size: clamp(1.6rem, 4.5vw, 2.2rem); letter-spacing: -.02em; margin: 0 0 4px; text-wrap: balance; }
+header p { margin: 0; color: var(--ink-2); max-width: 70ch; }
+.grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+@media (max-width: 920px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+.col { display: grid; gap: 14px; min-width: 0; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 16px; min-width: 0; }
+.card h2 { font-family: var(--display); font-size: 1.02rem; margin: 0 0 2px; display: flex; align-items: center; gap: 8px; }
+.card > .sub { color: var(--ink-3); font-size: .84rem; margin: 0 0 12px; }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.row + .row { margin-top: 10px; }
+label.inline { display: flex; align-items: center; gap: 8px; font-size: .88rem; color: var(--ink-2); }
+button.b { font: inherit; font-weight: 600; font-size: .88rem; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); padding: 8px 13px; border-radius: 10px; cursor: pointer; }
+button.b:hover { border-color: var(--ink-3); }
+button.b.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.b[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-ink); }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+select, input[type=number] { font: inherit; font-size: .9rem; color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); border-radius: 9px; padding: 7px 9px; }
+input[type=number] { width: 86px; }
+.seg { display: inline-flex; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 2px; }
+.seg button { font: inherit; font-size: .84rem; font-weight: 600; border: 0; background: transparent; color: var(--ink-2); padding: 6px 10px; border-radius: 8px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 0 0 1px var(--line); }
+
+/* ---------- the device ---------- */
+.bench { padding: 22px 16px 16px; display: grid; justify-items: center; gap: 14px; background:
+  radial-gradient(120% 90% at 50% 0%, var(--surface) 0%, var(--surface-2) 100%); }
+.device { position: relative; width: min(100%, 640px); background: linear-gradient(180deg, var(--case-2), var(--case)); border-radius: 30px;
+  padding: 22px 22px 26px; box-shadow: 0 1px 0 var(--case-edge) inset, 0 18px 40px rgba(0,0,0,.28), 0 2px 6px rgba(0,0,0,.2); }
+.bezel { background: #121417; border-radius: 12px; padding: 10px; box-shadow: 0 0 0 1px rgba(255,255,255,.04) inset; }
+canvas#epd { display: block; width: 100%; aspect-ratio: 296 / 128; image-rendering: pixelated; image-rendering: crisp-edges; border-radius: 3px; background: var(--paper); }
+.dev-label { position: absolute; left: 26px; top: 6px; font: 600 .62rem var(--mono); letter-spacing: .18em; color: rgba(255,255,255,.28); text-transform: uppercase; }
+.hw-btn { position: absolute; display: grid; place-items: center; border: 0; cursor: pointer; background: var(--btn); color: rgba(255,255,255,.75);
+  font: 700 .62rem var(--mono); letter-spacing: .08em; box-shadow: 0 2px 0 #000, 0 0 0 2px var(--case-edge); touch-action: none; user-select: none; -webkit-user-select: none; }
+.hw-btn:active, .hw-btn.down { transform: translateY(2px); box-shadow: 0 0 0 #000, 0 0 0 2px var(--accent); color: #fff; }
+.hw-btn.bottom { bottom: -17px; width: 56px; height: 30px; border-radius: 0 0 12px 12px; }
+.hw-btn.top { top: -17px; width: 56px; height: 30px; border-radius: 12px 12px 0 0; }
+#btnLap { left: 12%; } #btnStart { left: calc(12% + 66px); } #btnPage { right: 16%; }
+.usb { position: absolute; bottom: -5px; left: calc(50% + 24px); width: 34px; height: 9px; border-radius: 5px; background: #0b0c0e; box-shadow: 0 0 0 2px var(--case-edge); }
+.switch { position: absolute; right: -15px; top: 40%; width: 18px; height: 44px; border-radius: 6px; border: 0; padding: 0; cursor: pointer; background: #0b0c0e; box-shadow: 0 0 0 2px var(--case-edge); }
+.switch::after { content: ""; position: absolute; left: 3px; width: 12px; height: 18px; border-radius: 4px; background: #c9ccd1; transition: top .15s; top: 23px; }
+.switch[aria-checked="true"]::after { top: 3px; background: var(--good); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; justify-content: center; font-size: .8rem; color: var(--ink-3); margin-top: 8px; }
+.legend kbd { font: 600 .74rem var(--mono); background: var(--surface); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 0 5px; color: var(--ink-2); }
+.hint { font-size: .8rem; color: var(--ink-3); text-align: center; max-width: 60ch; }
+
+/* ---------- readouts ---------- */
+.kv { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.kv div { background: var(--surface-2); border-radius: 10px; padding: 8px 10px; min-width: 0; }
+.kv span { display: block; font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-3); font-weight: 600; }
+.kv b { font: 600 .95rem var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+.log { margin: 12px 0 0; padding: 0; list-style: none; font: .82rem/1.45 var(--mono); max-height: 190px; overflow: auto; border-top: 1px solid var(--line); }
+.log li { padding: 5px 0; border-bottom: 1px dashed var(--line); display: flex; gap: 10px; }
+.log time { color: var(--ink-3); flex: none; }
+.log .warn { color: var(--warn); } .log .bad { color: var(--bad); } .log .good { color: var(--good); }
+.progress { height: 6px; background: var(--surface-2); border-radius: 99px; overflow: hidden; margin-top: 10px; }
+.progress span { display: block; height: 100%; background: var(--accent); width: 0; }
+.route-meta { font: .82rem var(--mono); color: var(--ink-2); margin-top: 6px; }
+.sensor { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+.sensor:first-of-type { border-top: 0; }
+.sensor .n { font-weight: 600; } .sensor .s { font-size: .8rem; color: var(--ink-3); }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--ink-3); margin-right: 6px; vertical-align: 1px; }
+.dot.on { background: var(--good); } .dot.wait { background: var(--warn); }
+.cfg { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+.cfg label { display: flex; flex-direction: column; gap: 4px; font: 600 .74rem var(--mono); color: var(--ink-2); }
+.phone { border: 1px solid var(--line); border-radius: 22px; padding: 14px; background: var(--surface-2); }
+.phone .bar { font: 600 .74rem var(--mono); color: var(--ink-3); display: flex; justify-content: space-between; margin-bottom: 8px; }
+.phone h3 { margin: 0 0 6px; font-size: 1rem; }
+.phone .page { background: var(--surface); border-radius: 12px; padding: 12px; font-size: .88rem; }
+.phone ul { margin: 8px 0 0; padding-left: 18px; font: .78rem var(--mono); color: var(--ink-2); }
+.notes { margin: 0; padding-left: 18px; color: var(--ink-2); font-size: .88rem; display: grid; gap: 6px; }
+.confirm { display: none; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 8px; font-size: .85rem; }
+.confirm.open { display: flex; }
+footer { margin-top: 22px; color: var(--ink-3); font-size: .78rem; }
+@media (prefers-reduced-motion: reduce) { .switch::after { transition: none; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Bike computer simulator</h1>
+    <p>This runs the v1 firmware's logic and screen layouts in your browser: the same ride maths, buttons, pages and e-paper refresh rules, drawn with the device's own fonts at its real 296 × 128 pixels. Start the ride below, press the buttons, connect sensors, then save and export the ride to Ride Log.</p>
+  </header>
+
+  <div class="grid">
+    <div class="col">
+      <section class="card bench" aria-label="Device">
+        <div class="device" id="device">
+          <span class="dev-label">Ride Log · v1</span>
+          <button class="hw-btn top" id="btnPage" aria-label="PAGE button (hold 3 s for a full screen refresh)">PAGE</button>
+          <div class="bezel"><canvas id="epd" width="296" height="128" role="img" aria-label="Bike computer screen"></canvas></div>
+          <button class="hw-btn bottom" id="btnLap" aria-label="LAP button">LAP</button>
+          <button class="hw-btn bottom" id="btnStart" aria-label="START button (hold 2 s to finish and save)">START</button>
+          <span class="usb" aria-hidden="true"></span>
+          <button class="switch" id="power" role="switch" aria-checked="true" aria-label="Power switch"></button>
+        </div>
+        <div>
+          <div class="legend">
+            <span><kbd>S</kbd> Start / pause · hold 2 s: finish</span><span><kbd>L</kbd> Lap</span><span><kbd>P</kbd> Page · hold 3 s: refresh</span><span>Side switch: power</span>
+          </div>
+          <p class="hint">While you hold a button the simulation runs at normal speed, so long presses take real seconds.</p>
+        </div>
+      </section>
+
+      <section class="card" aria-label="Inside the device">
+        <h2>Inside the device</h2>
+        <p class="sub">Live values from the firmware's ride state, plus everything it did.</p>
+        <div class="kv" id="kv"></div>
+        <ol class="log" id="log" aria-live="polite"></ol>
+      </section>
+    </div>
+
+    <div class="col">
+      <section class="card" aria-label="Ride">
+        <h2>The ride</h2>
+        <p class="sub">You're the rider. The device only records once you press START on it.</p>
+        <div class="row">
+          <select id="route" aria-label="Route"></select>
+          <button class="b primary" id="ridePlay" aria-pressed="false">Start riding</button>
+          <button class="b" id="rideReset">Back to start</button>
+        </div>
+        <div class="row">
+          <span style="font-size:.85rem;color:var(--ink-2)">Speed</span>
+          <div class="seg" id="speedSeg" role="group" aria-label="Simulation speed">
+            <button data-x="1">1×</button><button data-x="5">5×</button><button data-x="20">20×</button><button data-x="60">60×</button>
+          </div>
+          <button class="b" id="gpsToggle" aria-pressed="true">GPS signal on</button>
+        </div>
+        <div class="progress"><span id="routeBar"></span></div>
+        <div class="route-meta" id="routeMeta"></div>
+      </section>
+
+      <section class="card" aria-label="Sensors">
+        <h2>Bluetooth sensors</h2>
+        <p class="sub">Wake a sensor and the device connects at its next scan (it scans every 20 s while one is missing).</p>
+        <div id="sensors"></div>
+      </section>
+
+      <section class="card" aria-label="Settings">
+        <h2>config.h</h2>
+        <p class="sub">The same settings you'd edit before uploading the firmware.</p>
+        <div class="cfg">
+          <label>MAX_HR <input type="number" id="cfgMaxHr" min="0" max="230"></label>
+          <label>FTP_WATTS <input type="number" id="cfgFtp" min="0" max="600"></label>
+          <label>AUTO_LAP_KM <select id="cfgLap"><option value="0">0 (off)</option><option value="1">1</option><option value="5">5</option><option value="10">10</option></select></label>
+          <label>AUTO_PAUSE <select id="cfgPause"><option value="1">true</option><option value="0">false</option></select></label>
+        </div>
+      </section>
+
+      <section class="card" aria-label="Phone">
+        <h2>Your phone</h2>
+        <p class="sub" id="phoneSub">On the device, go to the Device page and hold START to turn on Wi-Fi transfer.</p>
+        <div class="phone" id="phone" hidden>
+          <div class="bar"><span id="phoneWifi">Wi-Fi</span><span>192.168.4.1</span></div>
+          <div class="page">
+            <h3>Ride Log bike computer</h3>
+            <div id="phoneCount"></div>
+            <div class="row" style="margin-top:8px"><button class="b primary" id="dlRides">Download rides</button><button class="b" id="clearRides">Delete rides from device</button></div>
+            <div class="confirm" id="clearConfirm"><span>Delete all rides from the device?</span><button class="b" id="clearYes">Delete</button><button class="b" id="clearNo">Keep</button></div>
+            <ul id="phoneList"></ul>
+            <p style="margin:10px 0 0;color:var(--ink-3);font-size:.8rem">Then in the <a href="https://gt265.github.io/ride-log/" target="_blank" rel="noopener">Ride Log app</a>: Settings → Import → pick the file.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="card" aria-label="Things to check">
+        <h2>Things worth trying</h2>
+        <ol class="notes">
+          <li>Start riding, then press START on the device. Watch distance and moving time count.</li>
+          <li>Ride through a traffic light: the device shows AUTO-PAUSE and moving time stops.</li>
+          <li>Press LAP, or set AUTO_LAP_KM to 1, and check the Laps page.</li>
+          <li>Wake the heart-rate strap and power meter, then look at the Sensors page and zones.</li>
+          <li>Hold START to save, go to the Device page, hold START for Wi-Fi, and download the ride.</li>
+          <li>Flip the power switch mid-ride: the e-paper keeps the last picture, but the unsaved ride is lost.</li>
+        </ol>
+      </section>
+    </div>
+  </div>
+  <footer>Screen drawn with the Adafruit GFX font bitmaps (FreeSans, GNU FreeFont) the firmware uses. Ride maths: a line-by-line port of ride_logic.h, checked against the C++ for identical results.</footer>
+</div>
+
+<script>@@FONTS@@</script>
+<script>@@CLASSIC@@</script>
+<script>@@RIDELOGIC@@</script>
+<script>
+'use strict';
+const { Ride, simplify, encodePolyline, hrZone, powerZone, lround } = window.RideLogic;
+const $ = s => document.querySelector(s);
+const store = { get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+                set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
+
+/* =====================================================================
+   Adafruit_GFX, ported: same text, rounded-rect and circle algorithms, so
+   pixels land exactly where the firmware puts them.
+   ===================================================================== */
+const W = 296, H = 128, INK = 1, PAPER = 0;
+function decodeFont(f) { const b = atob(f.bitmap); const bm = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) bm[i] = b.charCodeAt(i); return { ...f, bitmap: bm }; }
+const FONTS = Object.fromEntries(Object.entries(GFX_FONTS).map(([k, v]) => [k, decodeFont(v)]));
+const F9 = FONTS.FreeSans9pt7b, B12 = FONTS.FreeSansBold12pt7b, B18 = FONTS.FreeSansBold18pt7b;
+const CLASSIC = decodeFont({ ...GFX_CLASSIC, glyphs: [] }).bitmap;     // the built-in 5x7 font (glcdfont.c)
+class GFX {
+  constructor(w, h) { this.width = w; this.height = h; this.buf = new Uint8Array(w * h); this.font = null; this.sx = 1; this.sy = 1; this.color = INK; this.cx = 0; this.cy = 0; this.wrap = true; }
+  writePixel(x, y, c) { if (x < 0 || y < 0 || x >= this.width || y >= this.height) return; this.buf[y * this.width + x] = c; }
+  fillRect(x, y, w, h, c) { for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) this.writePixel(x + i, y + j, c); }
+  vline(x, y, h, c) { this.fillRect(x, y, 1, h, c); }
+  hline(x, y, w, c) { this.fillRect(x, y, w, 1, c); }
+  fillScreen(c) { this.buf.fill(c); }
+  drawCircleHelper(x0, y0, r, corner, c) {
+    let f = 1 - r, ddx = 1, ddy = -2 * r, x = 0, y = r; const P = (a, b) => this.writePixel(a, b, c);
+    while (x < y) {
+      if (f >= 0) { y--; ddy += 2; f += ddy; }
+      x++; ddx += 2; f += ddx;
+      if (corner & 4) { P(x0 + x, y0 + y); P(x0 + y, y0 + x); }
+      if (corner & 2) { P(x0 + x, y0 - y); P(x0 + y, y0 - x); }
+      if (corner & 8) { P(x0 - y, y0 + x); P(x0 - x, y0 + y); }
+      if (corner & 1) { P(x0 - y, y0 - x); P(x0 - x, y0 - y); }
+    }
+  }
+  fillCircleHelper(x0, y0, r, corners, delta, c) {
+    let f = 1 - r, ddx = 1, ddy = -2 * r, x = 0, y = r, px = x, py = y; delta++;
+    while (x < y) {
+      if (f >= 0) { y--; ddy += 2; f += ddy; }
+      x++; ddx += 2; f += ddx;
+      if (x < y + 1) { if (corners & 1) this.vline(x0 + x, y0 - y, 2 * y + delta, c); if (corners & 2) this.vline(x0 - x, y0 - y, 2 * y + delta, c); }
+      if (y !== py) { if (corners & 1) this.vline(x0 + py, y0 - px, 2 * px + delta, c); if (corners & 2) this.vline(x0 - py, y0 - px, 2 * px + delta, c); py = y; }
+      px = x;
+    }
+  }
+  drawRoundRect(x, y, w, h, r, c) {
+    const m = Math.trunc((w < h ? w : h) / 2); if (r > m) r = m;
+    this.hline(x + r, y, w - 2 * r, c); this.hline(x + r, y + h - 1, w - 2 * r, c);
+    this.vline(x, y + r, h - 2 * r, c); this.vline(x + w - 1, y + r, h - 2 * r, c);
+    this.drawCircleHelper(x + r, y + r, r, 1, c); this.drawCircleHelper(x + w - r - 1, y + r, r, 2, c);
+    this.drawCircleHelper(x + w - r - 1, y + h - r - 1, r, 4, c); this.drawCircleHelper(x + r, y + h - r - 1, r, 8, c);
+  }
+  fillRoundRect(x, y, w, h, r, c) {
+    const m = Math.trunc((w < h ? w : h) / 2); if (r > m) r = m;
+    this.fillRect(x + r, y, w - 2 * r, h, c);
+    this.fillCircleHelper(x + w - r - 1, y + r, r, 1, h - 2 * r - 1, c);
+    this.fillCircleHelper(x + r, y + r, r, 2, h - 2 * r - 1, c);
+  }
+  setFont(f) { this.font = f; } setTextSize(s) { this.sx = this.sy = Math.max(1, s); } setTextColor(c) { this.color = c; } setCursor(x, y) { this.cx = x; this.cy = y; }
+  charBounds(c, st) {
+    const f = this.font;
+    if (c === 10) { st.x = 0; st.y += this.sy * f.yAdvance; return; }
+    if (c === 13 || c < f.first || c > f.last) return;
+    const [, gw, gh, xa, xo, yo] = f.glyphs[c - f.first];
+    if (this.wrap && st.x + (xo + gw) * this.sx > this.width) { st.x = 0; st.y += this.sy * f.yAdvance; }
+    const x1 = st.x + xo * this.sx, y1 = st.y + yo * this.sy, x2 = x1 + gw * this.sx - 1, y2 = y1 + gh * this.sy - 1;
+    if (x1 < st.minx) st.minx = x1; if (y1 < st.miny) st.miny = y1; if (x2 > st.maxx) st.maxx = x2; if (y2 > st.maxy) st.maxy = y2;
+    st.x += xa * this.sx;
+  }
+  getTextBounds(str, x, y) {
+    const st = { x, y, minx: 0x7FFF, miny: 0x7FFF, maxx: -1, maxy: -1 };
+    for (const ch of str) this.charBounds(ch.charCodeAt(0) & 0xff, st);
+    let bx = x, by = y, bw = 0, bh = 0;
+    if (st.maxx >= st.minx) { bx = st.minx; bw = st.maxx - st.minx + 1; }
+    if (st.maxy >= st.miny) { by = st.miny; bh = st.maxy - st.miny + 1; }
+    return { x1: bx, y1: by, w: bw, h: bh };
+  }
+  drawChar(x, y, c) {
+    const f = this.font, [bo0, w, h, , xo, yo] = f.glyphs[c - f.first]; let bo = bo0, bits = 0, bit = 0;
+    for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) {
+      if (!(bit++ & 7)) bits = f.bitmap[bo++];
+      if (bits & 0x80) {
+        if (this.sx === 1 && this.sy === 1) this.writePixel(x + xo + xx, y + yo + yy, this.color);
+        else this.fillRect(x + (xo + xx) * this.sx, y + (yo + yy) * this.sy, this.sx, this.sy, this.color);
+      }
+      bits = (bits << 1) & 0xff;
+    }
+  }
+  drawCharClassic(x, y, c) {
+    if (c >= 176) c++;                                       // Adafruit's classic-charset quirk (_cp437 off)
+    for (let i = 0; i < 5; i++) {
+      let line = CLASSIC[c * 5 + i];
+      for (let j = 0; j < 8; j++, line >>= 1) if (line & 1) {
+        if (this.sx === 1 && this.sy === 1) this.writePixel(x + i, y + j, this.color);
+        else this.fillRect(x + i * this.sx, y + j * this.sy, this.sx, this.sy, this.color);
+      }
+    }
+  }
+  write(c) {
+    const f = this.font;
+    if (!f) {                                                // classic built-in font: cursor is the TOP-left
+      if (c === 10) { this.cx = 0; this.cy += this.sy * 8; return; }
+      if (c === 13) return;
+      if (this.wrap && this.cx + this.sx * 6 > this.width) { this.cx = 0; this.cy += this.sy * 8; }
+      this.drawCharClassic(this.cx, this.cy, c); this.cx += this.sx * 6; return;
+    }
+    if (c === 10) { this.cx = 0; this.cy += this.sy * f.yAdvance; return; }
+    if (c === 13 || c < f.first || c > f.last) return;
+    const [, w, h, xa, xo] = f.glyphs[c - f.first];
+    if (w > 0 && h > 0) {
+      if (this.wrap && this.cx + this.sx * (xo + w) > this.width) { this.cx = 0; this.cy += this.sy * f.yAdvance; }
+      this.drawChar(this.cx, this.cy, c);
+    }
+    this.cx += xa * this.sx;
+  }
+  print(s) { for (const ch of String(s)) this.write(ch.charCodeAt(0) & 0xff); }
+}
+const display = new GFX(W, H);
+
+/* =====================================================================
+   The firmware (RideLogComputer.ino, HW_V1_ALIEXPRESS), ported function by function.
+   millis() is the simulated clock.
+   ===================================================================== */
+const CFG = Object.assign({ MAX_HR: 190, FTP_WATTS: 250, AUTO_PAUSE: true, AUTO_LAP_KM: 0 }, store.get('sim.cfg', {}));
+const UTC_OFFSET_MIN = -new Date().getTimezoneOffset();
+const AP_PASSWORD = 'ridelog123';
+const SERIAL = store.get('sim.serial', null) || (() => { const s = Math.floor(Math.random() * 0xffff).toString(16).toUpperCase().padStart(4, '0'); store.set('sim.serial', s); return s; })();
+let simMs = 0; const millis = () => Math.floor(simMs);
+const PAGE_RIDE = 0, PAGE_SENSORS = 1, PAGE_LAPS = 2, PAGE_DEVICE = 3, PAGE_COUNT = 4;
+
+let dev = null;          // all firmware globals live here; power-cycling makes a fresh one (RAM is lost)
+let flashRides = store.get('sim.flash', []);   // LittleFS: survives power-off
+const GPS = { fix: false, satellites: 0, year: 0, month: 0, day: 0, hour: 0, minute: 0, seconds: 0, HDOP: 0 };
+
+function freshDevice() {
+  return { ride: new Ride(), gpsFix: false, baroOk: true, wifiOn: false, sats: 0, gpsAccuracy: 99, lastFixMs: 0, page: PAGE_RIDE,
+    flashMsg: '', flashUntil: 0, lastSaved: '', redrawNow: false,
+    buttons: { lap: btn(100000), start: btn(2000), page: btn(3000) },
+    sensors: { hr: sensor('HR'), pw: sensor('PWR'), cad: sensor('CAD') }, cadence: -1, cadenceAt: 0, pwBuf: [-1, -1, -1], pwBufAt: [0, 0, 0], pwIdx: 0,
+    lastScan: 0, scanUntil: 0, lastDraw: 0, lastSecond: 0, lastBaro: 0, lastFullRefresh: 0, forceFull: true, gpsNext: 1000, bootedAt: 0 };
+}
+function btn(longMs) { return { longMs, down: false, longDone: false, pendingShort: false, pendingLong: false, downAt: 0, upAt: 0, pin: false }; }
+function sensor(label) { return { label, connected: false, found: false, value: -1, at: 0 }; }
+
+const flash = (msg, ms = 5000) => { dev.flashMsg = msg; dev.flashUntil = millis() + ms; log(msg); };
+const batteryPercent = () => -1;                        // v1: no spare pin
+const fmtTime = (sec) => { const s = lround(sec); return `${Math.trunc(s / 3600)}:${String(Math.trunc(s / 60) % 60).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`; };
+function daysFromCivil(y, m, d) {
+  y -= m <= 2 ? 1 : 0; const era = Math.trunc((y >= 0 ? y : y - 399) / 400); const yoe = y - era * 400;
+  const doy = Math.trunc((153 * (m + (m > 2 ? -3 : 9)) + 2) / 5) + d - 1; const doe = yoe * 365 + Math.trunc(yoe / 4) - Math.trunc(yoe / 100) + doy;
+  return era * 146097 + doe - 719468;
+}
+const nowEpoch = () => GPS.year === 0 ? 0 : daysFromCivil(2000 + GPS.year, GPS.month, GPS.day) * 86400 + GPS.hour * 3600 + GPS.minute * 60 + GPS.seconds;
+
+// ---- buttons (ISR + takePress, including the short-tap fix) ----
+function edge(b, pressed) {
+  b.pin = pressed; const t = millis();
+  if (pressed && !b.down && t - b.upAt > 30) { b.down = true; b.downAt = t; b.longDone = false; }
+  else if (!pressed && b.down && t - b.downAt > 30) {
+    b.down = false; b.upAt = t;
+    if (!b.longDone) { if (t - b.downAt >= b.longMs) b.pendingLong = true; else b.pendingShort = true; }
+  }
+}
+function takePress(b) {
+  if (b.down && !b.pin && millis() - b.downAt > 50) { b.down = false; b.upAt = millis(); if (!b.longDone) b.pendingShort = true; }
+  let r = 0;
+  if (b.down && !b.longDone && millis() - b.downAt >= b.longMs) { b.longDone = true; r = 2; }
+  else if (b.pendingLong) { b.pendingLong = false; r = 2; }
+  else if (b.pendingShort) { b.pendingShort = false; r = 1; }
+  if (r) dev.redrawNow = true;
+  return r;
+}
+
+// ---- sensors ----
+const sensorGet = s => millis() - s.at < 5000 ? s.value : -1;
+const cadenceNow = () => millis() - dev.cadenceAt < 5000 ? dev.cadence : -1;
+function power3s() { let sum = 0, n = 0; const now = millis(); for (let i = 0; i < 3; i++) if (dev.pwBuf[i] >= 0 && now - dev.pwBufAt[i] < 3500) { sum += dev.pwBuf[i]; n++; } return n ? Math.trunc(sum / n) : -1; }
+function serviceSensors() {
+  for (const [k, s] of Object.entries(dev.sensors)) {
+    if (!s.found) continue;
+    s.found = false;
+    if (world.sensors[k].on) { s.connected = true; flash(`${s.label} connected`, 3000); }
+  }
+  const missing = Object.values(dev.sensors).some(s => !s.connected);
+  if (missing && millis() - dev.lastScan > 20000 && millis() >= dev.scanUntil) { dev.lastScan = millis(); dev.scanUntil = millis() + 6000; log('Scanning for Bluetooth sensors (6 s)', 'dim'); }
+}
+
+// ---- saving rides (Ride Log JSON), as saveRide() ----
+function saveRide() {
+  const r = dev.ride, epoch = nowEpoch() + UTC_OFFSET_MIN * 60, day = epoch > 0 ? Math.floor(epoch / 86400) : 0;
+  const z = day + 719468, era = Math.floor((z >= 0 ? z : z - 146096) / 146097), doe = z - era * 146097;
+  const yoe = Math.trunc((doe - Math.trunc(doe / 1460) + Math.trunc(doe / 36524) - Math.trunc(doe / 146096)) / 365); let y = yoe + era * 400;
+  const doy = doe - (365 * yoe + Math.trunc(yoe / 4) - Math.trunc(yoe / 100)), mp = Math.trunc((5 * doy + 2) / 153), d = doy - Math.trunc((153 * mp + 2) / 5) + 1, m = mp < 10 ? mp + 3 : mp - 9;
+  y += m <= 2 ? 1 : 0;
+  const date = epoch > 0 ? `${String(y).padStart(4, '0')}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}` : '2000-01-01';
+  const hour = epoch > 0 ? Math.floor(epoch % 86400 / 3600) : 12;
+  const part = hour < 5 ? 'Night' : hour < 12 ? 'Morning' : hour < 17 ? 'Afternoon' : hour < 21 ? 'Evening' : 'Night';
+  const id = 'rlc' + epoch.toString(16) + Math.floor(Math.random() * 0xffff).toString(16).padStart(4, '0');
+  const n = v => v == null ? 'null' : String(v), b = r.best10k();
+  let j = `{"id":"${id}","date":"${date}","name":"${part} ride","type":"training","distance":${(r.dist / 1000).toFixed(2)},"time":${Math.max(1, lround(r.moving))}`;
+  j += `,"elevation":${lround(r.elev)},"power":${n(r.pwN ? Math.trunc(r.pwSum / r.pwN) : null)},"hr":${n(r.hrN ? Math.trunc(r.hrSum / r.hrN) : null)}`;
+  j += `,"cadence":${n(r.cadN ? Math.trunc(r.cadSum / r.cadN) : null)},"maxHr":${n(r.hrMax || null)},"best10k":${n(b > 0 ? lround(b) : null)}`;
+  j += `,"position":null,"notes":"Recorded with the Ride Log bike computer. Max ${(r.maxSpeed * 3.6).toFixed(1)} km/h."`;
+  if (r.track.length > 1) j += `,"track":"${encodePolyline(simplify(r.track)).replace(/["\\]/g, '\\$&')}"`;
+  if (r.laps.length) j += `,"laps":[${r.laps.map(l => `{"n":${l.n},"d":${l.d},"t":${l.t}}`).join(',')}]`;
+  j += ',"updatedAt":0}';
+  flashRides.push(j); store.set('sim.flash', flashRides);
+  dev.lastSaved = `${date} ${(r.dist / 1000).toFixed(1)} km`;
+  return true;
+}
+const rideCount = () => flashRides.length;
+const apName = () => `RideLog-${SERIAL}`;
+function setWifi(on) { if (on === dev.wifiOn) return; dev.wifiOn = on; flash(on ? 'Wi-Fi transfer on' : 'Wi-Fi transfer off', 3000); renderPhone(); }
+
+// ---- drawing: drawTopBar / drawPageContents / drawPage for the 296x128 e-paper ----
+function textAt(font, s, x, y, align = 0, color = INK) {
+  display.setFont(font); display.setTextColor(color);
+  const b = display.getTextBounds(s, 0, 0);
+  display.setCursor(align === 1 ? x - Math.trunc(b.w / 2) - b.x1 : align === 2 ? x - b.w - b.x1 : x, y); display.print(s);
+}
+function smallAt(s, x, y, align = 0, color = INK) {         // built-in 5x7 font; y = top of the text
+  display.setFont(null); display.setTextSize(1); display.setTextColor(color);
+  const w = String(s).length * 6 - 1;
+  display.setCursor(align === 1 ? x - Math.trunc(w / 2) : align === 2 ? x - w : x, y); display.print(s);
+}
+function field(x, y, w, h, label, value, font = B12) {
+  display.drawRoundRect(x, y, w, h, 5, INK);
+  smallAt(label, x + 5, y + 4);
+  textAt(font, value, x + w - 5, y + h - (font === B18 ? 7 : 6), 2);
+}
+const orDash = v => v >= 0 ? String(v) : '--';
+function drawTopBar() {
+  const r = dev.ride, bh = 12;
+  display.fillRect(0, 0, W, bh, INK);
+  const st = r.status === Ride.RUNNING ? (r.autoPaused ? 'AUTO-PAUSE' : 'REC') : r.status === Ride.PAUSED ? 'PAUSED' : r.status === Ride.FINISHED ? 'SAVED' : 'READY';
+  smallAt(st, 3, 2, 0, PAPER);
+  smallAt(dev.gpsFix ? `GPS ${dev.sats}` : 'GPS ...', W / 2, 2, 1, PAPER);
+  let hw = ''; for (const k of ['hr', 'pw', 'cad']) if (dev.sensors[k].connected) hw += (hw ? ' ' : '') + dev.sensors[k].label;
+  if (hw) smallAt(hw, W / 2 + 34, 2, 0, PAPER);
+  if (GPS.year) { const e = nowEpoch() + UTC_OFFSET_MIN * 60; smallAt(`${String(Math.floor(e % 86400 / 3600)).padStart(2, '0')}:${String(Math.floor(e % 3600 / 60)).padStart(2, '0')}`, W - 3, 2, 2, PAPER); }
+}
+function drawPageContents() {
+  const r = dev.ride, now = millis();
+  const kmh = (r.status === Ride.RUNNING && now - dev.lastFixMs < 6000) ? r.speed * 3.6 : 0;
+  const avg = r.avgSpeed();
+  const trend = (r.status === Ride.RUNNING && avg > 0 && r.moving > 30 && r.speed > 0.5) ? (r.speed > avg * 1.03 ? '+avg' : r.speed < avg * .97 ? '-avg' : '=avg') : '';
+  const hr = sensorGet(dev.sensors.hr), pw = power3s(), cad = cadenceNow();
+  const hz = hrZone(hr, CFG.MAX_HR), pz = powerZone(pw, CFG.FTP_WATTS);
+  if (dev.page === PAGE_RIDE) {
+    smallAt('SPEED', 6, 18);
+    display.setTextSize(2); textAt(B18, kmh.toFixed(kmh >= 100 ? 0 : 1), 170, 92, 2); display.setTextSize(1);
+    smallAt('km/h', 6, 112); smallAt(trend, 170, 112, 2);
+    field(178, 14, 116, 38, 'Distance km', (r.dist / 1000).toFixed(2));
+    field(178, 52, 116, 38, 'Moving', fmtTime(r.moving));
+    field(178, 90, 116, 38, 'Avg km/h', (avg * 3.6).toFixed(1));
+  } else if (dev.page === PAGE_SENSORS) {
+    field(2, 14, 145, 56, 'Heart rate bpm', orDash(hr), B18);
+    field(149, 14, 145, 56, 'Power 3s W', orDash(pw), B18);
+    field(2, 72, 96, 56, 'HR zone', hz ? 'Z' + hz : '--', B18);
+    field(100, 72, 96, 56, 'Power zone', pz ? 'Z' + pz : '--', B18);
+    field(198, 72, 96, 56, 'Cadence rpm', orDash(cad), B18);
+  } else if (dev.page === PAGE_LAPS) {
+    field(2, 14, 145, 56, 'Lap time', fmtTime(r.lapTime()));
+    field(149, 14, 145, 56, 'Lap distance km', (r.lapDist() / 1000).toFixed(2), B18);
+    if (r.laps.length) {
+      const l = r.laps[r.laps.length - 1];
+      field(2, 72, 145, 56, `Last lap (${l.n})`, fmtTime(l.t));
+      field(149, 72, 145, 56, 'Last lap km/h', (l.t ? l.d / l.t * 3.6 : 0).toFixed(1), B18);
+    } else smallAt('Press LAP to start a new lap', W / 2, 96, 1);
+  }
+  if (dev.page === PAGE_DEVICE) {
+    let y = 44; const lh = 13;
+    textAt(B12, 'Device', 6, 36);
+    smallAt(`Rides saved: ${rideCount()}`, 6, y); y += lh;
+    smallAt(`Last: ${dev.lastSaved || '-'}`, 6, y); y += lh;
+    smallAt(`GPS ${dev.gpsFix ? 'fix' : 'searching'}   Barometer ${dev.baroOk ? 'ok' : 'MISSING'}`, 6, y); y += lh;
+    if (dev.wifiOn) { smallAt(`Wi-Fi ON: join ${apName()}`, 6, y); y += lh; smallAt(`password ${AP_PASSWORD}`, 6, y); y += lh; smallAt('then open http://192.168.4.1', 6, y); }
+    else smallAt('Hold START to send rides to your phone', 6, y);
+  }
+  if (millis() < dev.flashUntil) {
+    const bw = W - 24, bh = 34, by = (H - bh) / 2 + 6;
+    display.fillRoundRect(12, by, bw, bh, 8, INK);
+    textAt(F9, dev.flashMsg, W / 2, by + bh / 2 + 5, 1, PAPER);
+  }
+}
+function drawPage() {
+  const full = dev.forceFull || millis() - dev.lastFullRefresh > 180000;
+  if (full) { dev.lastFullRefresh = millis(); dev.forceFull = false; }
+  display.fillScreen(PAPER); drawTopBar(); drawPageContents();
+  panel.show(display.buf, full);
+}
+function splash(line) { display.fillScreen(PAPER); textAt(B18, 'Ride Log', W / 2, 60, 1); textAt(F9, line, W / 2, 92, 1); panel.show(display.buf, true); }
+
+// ---- buttons → actions (handleButtons) ----
+function handleButtons() {
+  const r = dev.ride, now = millis(), B = dev.buttons;
+  switch (takePress(B.start)) {
+    case 1:
+      if (r.status === Ride.IDLE || r.status === Ride.FINISHED) { r.autoPauseOn = CFG.AUTO_PAUSE; r.autoLapKm = CFG.AUTO_LAP_KM; r.start(now); flash(dev.gpsFix ? 'Ride started' : 'Started - waiting for GPS'); }
+      else if (r.status === Ride.RUNNING) { r.pause(now); flash('Paused - hold START to finish'); }
+      else if (r.status === Ride.PAUSED) { r.resume(now); flash('Resumed', 2000); }
+      break;
+    case 2:
+      if (r.status === Ride.RUNNING || r.status === Ride.PAUSED) {
+        r.finish(now);
+        flash(r.dist < 100 ? 'Too short - not saved' : saveRide() ? 'Ride saved' : 'SAVE FAILED', 5000);
+        dev.page = PAGE_RIDE; renderPhone();
+      } else if (dev.page === PAGE_DEVICE) setWifi(!dev.wifiOn);
+      break;
+  }
+  if (takePress(B.lap) === 1) {
+    if (r.lap()) { const l = r.laps[r.laps.length - 1]; flash(`Lap ${l.n}  ${fmtTime(l.t)}`); }
+  }
+  switch (takePress(B.page)) {
+    case 1: dev.page = (dev.page + 1) % PAGE_COUNT; break;
+    case 2: dev.forceFull = true; log('Full screen refresh (PAGE held 3 s)'); break;
+  }
+}
+
+// ---- setup() / one pass of loop() ----
+function setup() {
+  simMs = 0; dev = freshDevice(); GPS.fix = false; GPS.satellites = 0; GPS.year = 0;
+  splash('Starting...');
+  dev.lastScan = millis(); dev.scanUntil = millis() + 6000; dev.gpsNext = 1000;
+  log('Powered on: firmware starting, GPS searching');
+}
+function loopStep() {
+  const r = dev.ride;
+  // GPS: one RMC+GGA pair per second
+  if (millis() >= dev.gpsNext) {
+    dev.gpsNext += 1000;
+    const s = world.gpsSentence();
+    if (s) {
+      dev.gpsFix = GPS.fix; dev.sats = GPS.satellites; dev.gpsAccuracy = GPS.HDOP > 0 ? GPS.HDOP * 5.0 : 99;
+      if (dev.gpsFix) {
+        dev.lastFixMs = millis();
+        if (r.onFix(s.lat, s.lon, s.knots * 0.514444, dev.gpsAccuracy, dev.lastFixMs)) { const l = r.laps[r.laps.length - 1]; flash(`Lap ${l.n}  ${fmtTime(l.t)}`); }
+      }
+    }
+  }
+  const now = millis();
+  if (dev.baroOk && now - dev.lastBaro >= 250) { dev.lastBaro = now; r.onAltitude(world.alt + (Math.random() - .5) * 0.5); }
+  if (now - dev.lastSecond >= 1000) { dev.lastSecond = now; r.onSecond(sensorGet(dev.sensors.hr), power3s(), cadenceNow()); }
+  handleButtons();
+  serviceSensors();
+  const every = r.status === Ride.RUNNING ? 1000 : 4000;
+  if (now - dev.lastDraw >= every || dev.redrawNow) { dev.lastDraw = now; dev.redrawNow = false; drawPage(); }
+}
+
+/* =====================================================================
+   The e-paper panel: partial updates leave faint "ghosts" of old pixels;
+   a full refresh flashes black/white and clears them.
+   ===================================================================== */
+const panel = {
+  cur: new Uint8Array(W * H), ghost: new Float32Array(W * H), flashUntil: 0, partials: 0, fulls: 0,
+  show(buf, full) {
+    if (full) { this.ghost.fill(0); this.flashUntil = performance.now() + 420; this.fulls++; }
+    else { for (let i = 0; i < buf.length; i++) if (this.cur[i] === 1 && buf[i] === 0) this.ghost[i] = Math.min(0.14, this.ghost[i] + 0.035); this.partials++; }
+    this.cur.set(buf);
+  },
+};
+const ctx = $('#epd').getContext('2d'), img = ctx.createImageData(W, H);
+const hex = c => [parseInt(c.slice(1, 3), 16), parseInt(c.slice(3, 5), 16), parseInt(c.slice(5, 7), 16)];
+const PAPER_RGB = hex('#dfe0d8'), INK_RGB = hex('#1e201d');
+function paint() {
+  const t = panel.flashUntil - performance.now(), d = img.data;
+  if (t > 0) { const black = t > 210; for (let i = 0; i < W * H; i++) { const c = black ? INK_RGB : PAPER_RGB; d[i * 4] = c[0]; d[i * 4 + 1] = c[1]; d[i * 4 + 2] = c[2]; d[i * 4 + 3] = 255; } }
+  else for (let i = 0; i < W * H; i++) {
+    const g = panel.cur[i] ? 1 : panel.ghost[i];
+    for (let k = 0; k < 3; k++) d[i * 4 + k] = Math.round(PAPER_RGB[k] + (INK_RGB[k] - PAPER_RGB[k]) * g);
+    d[i * 4 + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
+/* =====================================================================
+   The world: you riding a route, GPS satellites, the air pressure, your sensors.
+   ===================================================================== */
+const ROUTES = [
+  { name: 'Morning loop · 12 km, two stops, one climb', loop: true, segs: [{ d: 1500, v: 26, g: 0 }, { stop: 35, why: 'traffic light' }, { d: 2500, v: 21, g: 4 }, { d: 800, v: 15, g: 7.5 }, { d: 2600, v: 38, g: -4.5 }, { stop: 22, why: 'junction' }, { d: 4600, v: 30, g: 0.3 }] },
+  { name: 'Hill repeats · 9 km, 3 × 1.4 km at 7 %', segs: [{ d: 500, v: 25, g: 0 }, { d: 1400, v: 15, g: 7, turn: 0 }, { d: 1400, v: 42, g: -7, turn: Math.PI }, { stop: 30, why: 'recover' }, { d: 1400, v: 15, g: 7, turn: Math.PI }, { d: 1400, v: 42, g: -7, turn: Math.PI }, { stop: 30, why: 'recover' }, { d: 1400, v: 14, g: 7, turn: Math.PI }, { d: 1400, v: 43, g: -7, turn: Math.PI }] },
+  { name: 'Steady 20 km, no stops', loop: true, segs: [{ d: 20000, v: 31, g: 0.2 }] },
+];
+const world = {
+  route: 0, seg: 0, segDone: 0, stopLeft: 0, riding: false, gpsOn: true, speedX: 1,
+  lat: 51.5033, lon: -0.1196, head: 0.6, alt: 18, v: 0, rideDist: 0, utcMs: Date.now(), poweredAt: 0, finished: false,
+  hr: 72, sensors: { hr: { on: false, label: 'Heart-rate strap' }, pw: { on: false, label: 'Power meter (with cadence)' }, cad: { on: false, label: 'Cadence sensor' } },
+  total() { return ROUTES[this.route].segs.reduce((a, s) => a + (s.d || 0), 0); },
+  reset() { Object.assign(this, { seg: 0, segDone: 0, stopLeft: 0, lat: 51.5033, lon: -0.1196, head: 0.6, alt: 18, v: 0, rideDist: 0, finished: false }); const s = ROUTES[this.route].segs[0]; if (s.stop) this.stopLeft = s.stop; },
+  grade() { const s = ROUTES[this.route].segs[this.seg]; return s && !s.stop ? s.g : 0; },
+  step(dt) {            // dt in seconds
+    this.utcMs += dt * 1000;
+    const R = ROUTES[this.route], s = R.segs[this.seg];
+    let target = 0;
+    if (this.riding && s && !this.finished) {
+      if (s.stop) { this.stopLeft -= dt; if (this.stopLeft <= 0) this.nextSeg(); }
+      else target = s.v / 3.6 * (1 + 0.04 * Math.sin(this.utcMs / 7000) + 0.03 * Math.sin(this.utcMs / 2300));
+    }
+    this.v += (target - this.v) * Math.min(1, dt / (target > this.v ? 4 : 1.6));     // accelerate gently, brake faster
+    if (this.v < 0.05) this.v = 0;
+    const dm = this.v * dt;
+    if (dm > 0 && s && !s.stop) {
+      this.segDone += dm; this.rideDist += dm;
+      this.head += R.loop ? dm * (2 * Math.PI / this.total()) * (1 + 0.6 * Math.sin(this.rideDist / 600)) : dm * 0.00012 * Math.sin(this.rideDist / 300);
+      this.lat += dm * Math.cos(this.head) / 111320; this.lon += dm * Math.sin(this.head) / (111320 * Math.cos(this.lat * Math.PI / 180));
+      this.alt += dm * s.g / 100;
+      if (this.segDone >= s.d) this.nextSeg();
+    }
+    // rider effort → power, heart rate, cadence
+    const g = this.grade() / 100, pw = this.v > 0.5 ? Math.max(0, 0.5 * 1.2 * 0.34 * this.v ** 3 + 80 * 9.81 * this.v * (g + 0.004)) : 0;
+    this.power = Math.round(pw * (0.92 + 0.16 * Math.random()));
+    this.hr += ((pw > 0 ? 78 + pw * 0.33 : 74) - this.hr) * Math.min(1, dt / 22);
+    this.cad = this.v > 1 ? Math.round(86 + 6 * Math.sin(this.utcMs / 9000) + Math.random() * 3) : 0;
+  },
+  nextSeg() {
+    const R = ROUTES[this.route]; this.seg++; this.segDone = 0;
+    if (this.seg >= R.segs.length) { this.finished = true; this.seg = R.segs.length; log('Route finished: you\u2019ve stopped. Hold START on the device to save.', 'good'); return; }
+    const s = R.segs[this.seg]; if (s.turn) this.head += s.turn;
+    if (s.stop) { this.stopLeft = s.stop; log(`Stopping ${s.stop} s (${s.why})`, 'dim'); }
+  },
+  gpsSentence() {
+    if (!this.gpsOn) { GPS.fix = false; GPS.satellites = 0; return null; }
+    const since = millis() - this.poweredAt;
+    if (since < 9000) { GPS.fix = false; GPS.satellites = Math.floor(since / 2500); return { lat: 0, lon: 0, knots: 0 }; }
+    const u = new Date(this.utcMs);
+    Object.assign(GPS, { fix: true, satellites: 8 + Math.round(2 * Math.sin(this.utcMs / 60000)), HDOP: 0.9 + 0.3 * Math.random(),
+      year: u.getUTCFullYear() - 2000, month: u.getUTCMonth() + 1, day: u.getUTCDate(), hour: u.getUTCHours(), minute: u.getUTCMinutes(), seconds: u.getUTCSeconds() });
+    const jitter = () => (Math.random() - .5) * 2.4e-5;     // about ±1.3 m
+    return { lat: this.lat + jitter(), lon: this.lon + jitter(), knots: Math.round(this.v / 0.514444 * 100) / 100 };
+  },
+  sensorStep() {        // once a second: connected sensors send a reading
+    const S = dev.sensors, now = millis();
+    for (const k of ['hr', 'pw', 'cad']) {
+      if (S[k].connected && !this.sensors[k].on) { S[k].connected = false; log(`${S[k].label} disconnected`, 'warn'); }
+      if (!S[k].connected && this.sensors[k].on && now < dev.scanUntil) S[k].found = true;
+    }
+    if (S.hr.connected) { S.hr.value = Math.round(this.hr + Math.random() * 2); S.hr.at = now; }
+    if (S.pw.connected) { S.pw.value = this.power; S.pw.at = now; dev.pwBuf[dev.pwIdx] = this.power; dev.pwBufAt[dev.pwIdx] = now; dev.pwIdx = (dev.pwIdx + 1) % 3; }
+    if (S.pw.connected || S.cad.connected) { dev.cadence = this.cad; dev.cadenceAt = now; }
+  },
+};
+
+/* =====================================================================
+   Running it: advance simulated time in 50 ms steps, as fast as the speed setting asks.
+   ===================================================================== */
+let powered = true, last = performance.now(), sensorAcc = 0, worldAcc = 0;
+const held = () => Object.values(dev.buttons).some(b => b.pin);
+function frame(t) {
+  const realDt = Math.min(0.1, (t - last) / 1000); last = t;
+  const x = held() ? 1 : world.speedX;
+  let vdt = realDt * x * 1000;
+  while (vdt > 0) {
+    const step = Math.min(50, vdt); vdt -= step;
+    worldAcc += step; if (worldAcc >= 200) { world.step(worldAcc / 1000); worldAcc = 0; }
+    if (!powered) continue;
+    simMs += step;
+    sensorAcc += step; if (sensorAcc >= 1000) { sensorAcc -= 1000; world.sensorStep(); }
+    loopStep();
+  }
+  paint(); renderInfo();
+  requestAnimationFrame(frame);
+}
+
+/* ---------------- UI ---------------- */
+const logEl = $('#log');
+function log(msg, cls = '') {
+  const li = document.createElement('li'); const tm = document.createElement('time');
+  const s = Math.floor(simMs / 1000); tm.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  const span = document.createElement('span'); span.textContent = msg; if (cls) span.className = cls;
+  li.append(tm, span); logEl.prepend(li);
+  while (logEl.children.length > 60) logEl.lastChild.remove();
+}
+function renderInfo() {
+  const r = dev.ride, st = ['Idle', 'Recording', 'Paused', 'Saved'][r.status] + (r.status === Ride.RUNNING && r.autoPaused ? ' (auto-paused)' : '');
+  const rows = [
+    ['Status', powered ? st : 'Power off'], ['Distance', (r.dist / 1000).toFixed(3) + ' km'], ['Moving time', fmtTime(r.moving)], ['Elapsed', fmtTime(r.elapsed(millis()) / 1000)],
+    ['Speed (device)', (r.speed * 3.6).toFixed(1) + ' km/h'], ['Average', (r.avgSpeed() * 3.6).toFixed(1) + ' km/h'], ['Climbing', r.elev.toFixed(1) + ' m'], ['Laps', String(r.laps.length)],
+    ['Route points', String(r.track.length)], ['Fastest 10 km', r.best10k() > 0 ? fmtTime(r.best10k()) : '—'],
+    ['Avg HR / power', `${r.hrN ? Math.trunc(r.hrSum / r.hrN) : '—'} / ${r.pwN ? Math.trunc(r.pwSum / r.pwN) + ' W' : '—'}`],
+    ['GPS', dev.gpsFix ? `fix, ${dev.sats} sats, ±${dev.gpsAccuracy.toFixed(0)} m` : 'searching'],
+    ['Screen refreshes', `${panel.partials} partial · ${panel.fulls} full`], ['Rides in flash', String(rideCount())], ['Uptime', fmtTime(millis() / 1000)], ['You (real)', `${(world.v * 3.6).toFixed(1)} km/h · ${world.grade()} %`],
+  ];
+  const kv = $('#kv');
+  if (kv.children.length !== rows.length) kv.innerHTML = rows.map(() => '<div><span></span><b></b></div>').join('');
+  rows.forEach(([k, v], i) => { const c = kv.children[i]; c.firstChild.textContent = k; c.lastChild.textContent = v; });
+  const tot = world.total();
+  $('#routeBar').style.width = Math.min(100, world.rideDist / tot * 100) + '%';
+  $('#routeMeta').textContent = `${(world.rideDist / 1000).toFixed(2)} / ${(tot / 1000).toFixed(1)} km · ${world.finished ? 'finished' : world.riding ? (ROUTES[world.route].segs[world.seg]?.stop ? `stopped (${Math.ceil(world.stopLeft)} s)` : 'riding') : 'standing still'} · simulated time ${fmtTime(simMs / 1000)}`;
+  renderSensorStates();
+}
+
+// route + speed + GPS
+$('#route').innerHTML = ROUTES.map((r, i) => `<option value="${i}">${r.name}</option>`).join('');
+$('#route').onchange = e => { world.route = +e.target.value; world.reset(); world.riding = false; syncPlay(); log(`Route: ${ROUTES[world.route].name}`, 'dim'); };
+function syncPlay() { const b = $('#ridePlay'); b.textContent = world.riding ? 'Stop at the roadside' : world.rideDist > 0 ? 'Ride on' : 'Start riding'; b.setAttribute('aria-pressed', String(world.riding)); }
+$('#ridePlay').onclick = () => { world.riding = !world.riding; if (world.finished && world.riding) { world.reset(); } syncPlay(); log(world.riding ? 'You start pedalling' : 'You stop at the roadside', 'dim'); };
+$('#rideReset').onclick = () => { world.reset(); world.riding = false; syncPlay(); log('Back at the start of the route', 'dim'); };
+$('#speedSeg').onclick = e => { const b = e.target.closest('[data-x]'); if (!b) return; world.speedX = +b.dataset.x; syncSpeed(); };
+function syncSpeed() { document.querySelectorAll('#speedSeg button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.x === world.speedX))); }
+$('#gpsToggle').onclick = e => { world.gpsOn = !world.gpsOn; e.target.textContent = world.gpsOn ? 'GPS signal on' : 'GPS signal lost (tunnel)'; e.target.setAttribute('aria-pressed', String(world.gpsOn)); log(world.gpsOn ? 'GPS signal back' : 'Into a tunnel: no GPS', world.gpsOn ? 'dim' : 'warn'); };
+
+// sensors
+function renderSensors() {
+  $('#sensors').innerHTML = Object.entries(world.sensors).map(([k, s]) => `<div class="sensor"><div><div class="n">${s.label}</div><div class="s" id="ss-${k}"></div></div>
+    <button class="b" data-sensor="${k}" aria-pressed="${s.on}">${s.on ? 'Turn off' : 'Wake up'}</button></div>`).join('');
+}
+function renderSensorStates() {
+  for (const [k, s] of Object.entries(world.sensors)) {
+    const el = $('#ss-' + k); if (!el) continue;
+    const d = dev.sensors[k];
+    const txt = !s.on ? 'Asleep' : d.connected ? `Connected · ${k === 'hr' ? Math.round(world.hr) + ' bpm' : k === 'pw' ? world.power + ' W' : world.cad + ' rpm'}` : millis() < dev.scanUntil ? 'Awake · device is scanning…' : `Awake · waiting for the device's next scan (${Math.max(0, Math.ceil((20000 - (millis() - dev.lastScan)) / 1000))} s)`;
+    const cls = !s.on ? '' : d.connected ? 'on' : 'wait';
+    if (el.dataset.t !== txt) { el.dataset.t = txt; el.innerHTML = `<span class="dot ${cls}"></span>${txt}`; }
+  }
+}
+$('#sensors').onclick = e => { const b = e.target.closest('[data-sensor]'); if (!b) return; const s = world.sensors[b.dataset.sensor]; s.on = !s.on; renderSensors(); log(`${s.label} ${s.on ? 'woken up' : 'switched off'}`, 'dim'); };
+
+// config.h
+const cfgEls = { MAX_HR: '#cfgMaxHr', FTP_WATTS: '#cfgFtp', AUTO_LAP_KM: '#cfgLap', AUTO_PAUSE: '#cfgPause' };
+for (const [k, sel] of Object.entries(cfgEls)) {
+  const el = $(sel); el.value = k === 'AUTO_PAUSE' ? (CFG[k] ? '1' : '0') : String(CFG[k]);
+  el.onchange = () => { CFG[k] = k === 'AUTO_PAUSE' ? el.value === '1' : Math.max(0, +el.value || 0); store.set('sim.cfg', CFG); log(`config.h: ${k} = ${CFG[k]} (used from the next ride)`, 'dim'); };
+}
+
+// hardware buttons: pointer + keyboard
+const BTN = { btnLap: 'lap', btnStart: 'start', btnPage: 'page' }, KEY = { s: 'start', l: 'lap', p: 'page' };
+const press = (k, down) => { if (!powered) return; const b = dev.buttons[k]; if (b.pin === down) return; edge(b, down); document.getElementById(Object.keys(BTN).find(id => BTN[id] === k)).classList.toggle('down', down); };
+for (const [id, k] of Object.entries(BTN)) {
+  const el = document.getElementById(id);
+  el.addEventListener('pointerdown', e => { e.preventDefault(); el.setPointerCapture(e.pointerId); press(k, true); });
+  ['pointerup', 'pointercancel'].forEach(ev => el.addEventListener(ev, () => press(k, false)));
+  el.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.repeat) { e.preventDefault(); press(k, true); } });
+  el.addEventListener('keyup', e => { if (e.key === 'Enter') press(k, false); });
+}
+document.addEventListener('keydown', e => { const k = KEY[e.key.toLowerCase()]; if (!k || e.repeat || e.ctrlKey || e.metaKey || e.altKey || /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return; e.preventDefault(); press(k, true); });
+document.addEventListener('keyup', e => { const k = KEY[e.key.toLowerCase()]; if (k) press(k, false); });
+
+// power switch
+$('#power').onclick = e => {
+  powered = !powered; e.target.setAttribute('aria-checked', String(powered));
+  if (!powered) {
+    const lost = dev.ride.status === Ride.RUNNING || dev.ride.status === Ride.PAUSED;
+    log(lost ? 'Power off: the ride in progress was NOT saved (v1 keeps rides only when you finish them)' : 'Power off: the e-paper keeps showing the last screen', lost ? 'bad' : '');
+    Object.values(dev.buttons).forEach(b => b.pin = false); dev.wifiOn = false; renderPhone();
+  } else { world.poweredAt = 0; setup(); }
+};
+
+// phone (Wi-Fi transfer page)
+function renderPhone() {
+  const on = powered && dev && dev.wifiOn;
+  $('#phone').hidden = !on;
+  $('#phoneSub').textContent = on ? `Joined ${apName()} (password ${AP_PASSWORD}) and opened http://192.168.4.1` : 'On the device, go to the Device page and hold START to turn on Wi-Fi transfer.';
+  $('#phoneWifi').textContent = apName();
+  $('#phoneCount').textContent = `${rideCount()} ride(s) saved on the device.`;
+  $('#phoneList').innerHTML = flashRides.map(j => { try { const r = JSON.parse(j); return `<li>${r.id}.json · ${r.date} · ${r.distance} km</li>`; } catch { return ''; } }).join('');
+}
+$('#dlRides').onclick = async () => {
+  if (!flashRides.length) { log('No rides on the device yet', 'warn'); return; }
+  const data = '[' + flashRides.join(',') + ']', filename = 'ridelog-device-rides.json';
+  const dl = window.claude?.use ? await window.claude.use('downloads').catch(() => null) : null;
+  if (dl) { try { await dl.save({ filename, data }); log('Downloaded ' + filename, 'good'); } catch (x) { if (x?.code !== 'declined') log('Download not available here', 'warn'); } return; }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([data], { type: 'application/json' })); a.download = filename; document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 0);
+  log('Downloaded ' + filename, 'good');
+};
+$('#clearRides').onclick = () => $('#clearConfirm').classList.add('open');
+$('#clearNo').onclick = () => $('#clearConfirm').classList.remove('open');
+$('#clearYes').onclick = () => { flashRides = []; store.set('sim.flash', flashRides); $('#clearConfirm').classList.remove('open'); renderPhone(); log('Rides deleted from the device'); };
+
+// go
+world.reset(); renderSensors(); syncPlay(); syncSpeed();
+setup(); world.poweredAt = 0; renderPhone();
+requestAnimationFrame(frame);
+</script>

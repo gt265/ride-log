@@ -18,6 +18,8 @@ A small GPS bike computer you can build yourself, with a screen you can read in 
 
 Shopping list with links for both versions: [`shopping-list.html`](shopping-list.html) (open it in a browser).
 
+**Try it before you buy anything:** [`simulator/index.html`](simulator/index.html) runs the v1 firmware's logic and screens in your browser. Ride a route, press the buttons, connect sensors, save the ride and import it into Ride Log.
+
 | v1 front | v1 exploded |
 |---|---|
 | ![v1 front](images/v1_front.png) | ![v1 exploded](images/v1_exploded.png) |

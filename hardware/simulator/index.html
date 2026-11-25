@@ -1,0 +1,946 @@
+<title>Ride Log Bike Computer Simulator</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a workbench. Left: the device itself (graphite case, e-paper screen, real buttons) and what's
+   happening inside it. Right: the "world" you control: the ride, the sensors, the settings, a phone. */
+:root {
+  --bg: #eceef0; --surface: #ffffff; --surface-2: #f4f5f6; --line: #dcdfe3; --ink: #15181b; --ink-2: #4d545c; --ink-3: #7f8790;
+  --accent: #2a78d6; --accent-ink: #1f63b5; --accent-soft: rgba(42,120,214,.1);
+  --good: #1b7f3b; --warn: #a86b00; --bad: #c93b3a;
+  --case: #23262b; --case-2: #2f3339; --case-edge: #3b4047; --btn: #16181b;
+  --paper: #dfe0d8; --epd-ink: #1e201d;
+  --display: "Space Grotesk", "Inter", system-ui, sans-serif; --body: "Inter", system-ui, -apple-system, sans-serif; --mono: "JetBrains Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f1113; --surface: #181b1e; --surface-2: #1f2327; --line: #2c3136; --ink: #eef0f2; --ink-2: #b5bcc4; --ink-3: #848c95;
+  --accent: #5b9ef0; --accent-ink: #8bbcf6; --accent-soft: rgba(91,158,240,.14); --good: #4cc46f; --warn: #e0a106; --bad: #ef6a6a;
+  --case: #2a2e34; --case-2: #353a41; --case-edge: #444a52; --btn: #101214; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0f1113; --surface: #181b1e; --surface-2: #1f2327; --line: #2c3136; --ink: #eef0f2; --ink-2: #b5bcc4; --ink-3: #848c95;
+  --accent: #5b9ef0; --accent-ink: #8bbcf6; --accent-soft: rgba(91,158,240,.14); --good: #4cc46f; --warn: #e0a106; --bad: #ef6a6a;
+  --case: #2a2e34; --case-2: #353a41; --case-edge: #444a52; --btn: #101214; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 var(--body); }
+.wrap { max-width: 1180px; margin: 0 auto; padding-block: 24px 48px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+header { margin-bottom: 18px; }
+header h1 { font-family: var(--display); font-size: clamp(1.6rem, 4.5vw, 2.2rem); letter-spacing: -.02em; margin: 0 0 4px; text-wrap: balance; }
+header p { margin: 0; color: var(--ink-2); max-width: 70ch; }
+.grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+@media (max-width: 920px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+.col { display: grid; gap: 14px; min-width: 0; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 16px; min-width: 0; }
+.card h2 { font-family: var(--display); font-size: 1.02rem; margin: 0 0 2px; display: flex; align-items: center; gap: 8px; }
+.card > .sub { color: var(--ink-3); font-size: .84rem; margin: 0 0 12px; }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.row + .row { margin-top: 10px; }
+label.inline { display: flex; align-items: center; gap: 8px; font-size: .88rem; color: var(--ink-2); }
+button.b { font: inherit; font-weight: 600; font-size: .88rem; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); padding: 8px 13px; border-radius: 10px; cursor: pointer; }
+button.b:hover { border-color: var(--ink-3); }
+button.b.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.b[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-ink); }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+select, input[type=number] { font: inherit; font-size: .9rem; color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); border-radius: 9px; padding: 7px 9px; }
+input[type=number] { width: 86px; }
+.seg { display: inline-flex; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 2px; }
+.seg button { font: inherit; font-size: .84rem; font-weight: 600; border: 0; background: transparent; color: var(--ink-2); padding: 6px 10px; border-radius: 8px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 0 0 1px var(--line); }
+
+/* ---------- the device ---------- */
+.bench { padding: 22px 16px 16px; display: grid; justify-items: center; gap: 14px; background:
+  radial-gradient(120% 90% at 50% 0%, var(--surface) 0%, var(--surface-2) 100%); }
+.device { position: relative; width: min(100%, 640px); background: linear-gradient(180deg, var(--case-2), var(--case)); border-radius: 30px;
+  padding: 22px 22px 26px; box-shadow: 0 1px 0 var(--case-edge) inset, 0 18px 40px rgba(0,0,0,.28), 0 2px 6px rgba(0,0,0,.2); }
+.bezel { background: #121417; border-radius: 12px; padding: 10px; box-shadow: 0 0 0 1px rgba(255,255,255,.04) inset; }
+canvas#epd { display: block; width: 100%; aspect-ratio: 296 / 128; image-rendering: pixelated; image-rendering: crisp-edges; border-radius: 3px; background: var(--paper); }
+.dev-label { position: absolute; left: 26px; top: 6px; font: 600 .62rem var(--mono); letter-spacing: .18em; color: rgba(255,255,255,.28); text-transform: uppercase; }
+.hw-btn { position: absolute; display: grid; place-items: center; border: 0; cursor: pointer; background: var(--btn); color: rgba(255,255,255,.75);
+  font: 700 .62rem var(--mono); letter-spacing: .08em; box-shadow: 0 2px 0 #000, 0 0 0 2px var(--case-edge); touch-action: none; user-select: none; -webkit-user-select: none; }
+.hw-btn:active, .hw-btn.down { transform: translateY(2px); box-shadow: 0 0 0 #000, 0 0 0 2px var(--accent); color: #fff; }
+.hw-btn.bottom { bottom: -17px; width: 56px; height: 30px; border-radius: 0 0 12px 12px; }
+.hw-btn.top { top: -17px; width: 56px; height: 30px; border-radius: 12px 12px 0 0; }
+#btnLap { left: 12%; } #btnStart { left: calc(12% + 66px); } #btnPage { right: 16%; }
+.usb { position: absolute; bottom: -5px; left: calc(50% + 24px); width: 34px; height: 9px; border-radius: 5px; background: #0b0c0e; box-shadow: 0 0 0 2px var(--case-edge); }
+.switch { position: absolute; right: -15px; top: 40%; width: 18px; height: 44px; border-radius: 6px; border: 0; padding: 0; cursor: pointer; background: #0b0c0e; box-shadow: 0 0 0 2px var(--case-edge); }
+.switch::after { content: ""; position: absolute; left: 3px; width: 12px; height: 18px; border-radius: 4px; background: #c9ccd1; transition: top .15s; top: 23px; }
+.switch[aria-checked="true"]::after { top: 3px; background: var(--good); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; justify-content: center; font-size: .8rem; color: var(--ink-3); margin-top: 8px; }
+.legend kbd { font: 600 .74rem var(--mono); background: var(--surface); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 0 5px; color: var(--ink-2); }
+.hint { font-size: .8rem; color: var(--ink-3); text-align: center; max-width: 60ch; }
+
+/* ---------- readouts ---------- */
+.kv { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.kv div { background: var(--surface-2); border-radius: 10px; padding: 8px 10px; min-width: 0; }
+.kv span { display: block; font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-3); font-weight: 600; }
+.kv b { font: 600 .95rem var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+.log { margin: 12px 0 0; padding: 0; list-style: none; font: .82rem/1.45 var(--mono); max-height: 190px; overflow: auto; border-top: 1px solid var(--line); }
+.log li { padding: 5px 0; border-bottom: 1px dashed var(--line); display: flex; gap: 10px; }
+.log time { color: var(--ink-3); flex: none; }
+.log .warn { color: var(--warn); } .log .bad { color: var(--bad); } .log .good { color: var(--good); }
+.progress { height: 6px; background: var(--surface-2); border-radius: 99px; overflow: hidden; margin-top: 10px; }
+.progress span { display: block; height: 100%; background: var(--accent); width: 0; }
+.route-meta { font: .82rem var(--mono); color: var(--ink-2); margin-top: 6px; }
+.sensor { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+.sensor:first-of-type { border-top: 0; }
+.sensor .n { font-weight: 600; } .sensor .s { font-size: .8rem; color: var(--ink-3); }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--ink-3); margin-right: 6px; vertical-align: 1px; }
+.dot.on { background: var(--good); } .dot.wait { background: var(--warn); }
+.cfg { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+.cfg label { display: flex; flex-direction: column; gap: 4px; font: 600 .74rem var(--mono); color: var(--ink-2); }
+.phone { border: 1px solid var(--line); border-radius: 22px; padding: 14px; background: var(--surface-2); }
+.phone .bar { font: 600 .74rem var(--mono); color: var(--ink-3); display: flex; justify-content: space-between; margin-bottom: 8px; }
+.phone h3 { margin: 0 0 6px; font-size: 1rem; }
+.phone .page { background: var(--surface); border-radius: 12px; padding: 12px; font-size: .88rem; }
+.phone ul { margin: 8px 0 0; padding-left: 18px; font: .78rem var(--mono); color: var(--ink-2); }
+.notes { margin: 0; padding-left: 18px; color: var(--ink-2); font-size: .88rem; display: grid; gap: 6px; }
+.confirm { display: none; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 8px; font-size: .85rem; }
+.confirm.open { display: flex; }
+footer { margin-top: 22px; color: var(--ink-3); font-size: .78rem; }
+@media (prefers-reduced-motion: reduce) { .switch::after { transition: none; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Bike computer simulator</h1>
+    <p>This runs the v1 firmware's logic and screen layouts in your browser: the same ride maths, buttons, pages and e-paper refresh rules, drawn with the device's own fonts at its real 296 × 128 pixels. Start the ride below, press the buttons, connect sensors, then save and export the ride to Ride Log.</p>
+  </header>
+
+  <div class="grid">
+    <div class="col">
+      <section class="card bench" aria-label="Device">
+        <div class="device" id="device">
+          <span class="dev-label">Ride Log · v1</span>
+          <button class="hw-btn top" id="btnPage" aria-label="PAGE button (hold 3 s for a full screen refresh)">PAGE</button>
+          <div class="bezel"><canvas id="epd" width="296" height="128" role="img" aria-label="Bike computer screen"></canvas></div>
+          <button class="hw-btn bottom" id="btnLap" aria-label="LAP button">LAP</button>
+          <button class="hw-btn bottom" id="btnStart" aria-label="START button (hold 2 s to finish and save)">START</button>
+          <span class="usb" aria-hidden="true"></span>
+          <button class="switch" id="power" role="switch" aria-checked="true" aria-label="Power switch"></button>
+        </div>
+        <div>
+          <div class="legend">
+            <span><kbd>S</kbd> Start / pause · hold 2 s: finish</span><span><kbd>L</kbd> Lap</span><span><kbd>P</kbd> Page · hold 3 s: refresh</span><span>Side switch: power</span>
+          </div>
+          <p class="hint">While you hold a button the simulation runs at normal speed, so long presses take real seconds.</p>
+        </div>
+      </section>
+
+      <section class="card" aria-label="Inside the device">
+        <h2>Inside the device</h2>
+        <p class="sub">Live values from the firmware's ride state, plus everything it did.</p>
+        <div class="kv" id="kv"></div>
+        <ol class="log" id="log" aria-live="polite"></ol>
+      </section>
+    </div>
+
+    <div class="col">
+      <section class="card" aria-label="Ride">
+        <h2>The ride</h2>
+        <p class="sub">You're the rider. The device only records once you press START on it.</p>
+        <div class="row">
+          <select id="route" aria-label="Route"></select>
+          <button class="b primary" id="ridePlay" aria-pressed="false">Start riding</button>
+          <button class="b" id="rideReset">Back to start</button>
+        </div>
+        <div class="row">
+          <span style="font-size:.85rem;color:var(--ink-2)">Speed</span>
+          <div class="seg" id="speedSeg" role="group" aria-label="Simulation speed">
+            <button data-x="1">1×</button><button data-x="5">5×</button><button data-x="20">20×</button><button data-x="60">60×</button>
+          </div>
+          <button class="b" id="gpsToggle" aria-pressed="true">GPS signal on</button>
+        </div>
+        <div class="progress"><span id="routeBar"></span></div>
+        <div class="route-meta" id="routeMeta"></div>
+      </section>
+
+      <section class="card" aria-label="Sensors">
+        <h2>Bluetooth sensors</h2>
+        <p class="sub">Wake a sensor and the device connects at its next scan (it scans every 20 s while one is missing).</p>
+        <div id="sensors"></div>
+      </section>
+
+      <section class="card" aria-label="Settings">
+        <h2>config.h</h2>
+        <p class="sub">The same settings you'd edit before uploading the firmware.</p>
+        <div class="cfg">
+          <label>MAX_HR <input type="number" id="cfgMaxHr" min="0" max="230"></label>
+          <label>FTP_WATTS <input type="number" id="cfgFtp" min="0" max="600"></label>
+          <label>AUTO_LAP_KM <select id="cfgLap"><option value="0">0 (off)</option><option value="1">1</option><option value="5">5</option><option value="10">10</option></select></label>
+          <label>AUTO_PAUSE <select id="cfgPause"><option value="1">true</option><option value="0">false</option></select></label>
+        </div>
+      </section>
+
+      <section class="card" aria-label="Phone">
+        <h2>Your phone</h2>
+        <p class="sub" id="phoneSub">On the device, go to the Device page and hold START to turn on Wi-Fi transfer.</p>
+        <div class="phone" id="phone" hidden>
+          <div class="bar"><span id="phoneWifi">Wi-Fi</span><span>192.168.4.1</span></div>
+          <div class="page">
+            <h3>Ride Log bike computer</h3>
+            <div id="phoneCount"></div>
+            <div class="row" style="margin-top:8px"><button class="b primary" id="dlRides">Download rides</button><button class="b" id="clearRides">Delete rides from device</button></div>
+            <div class="confirm" id="clearConfirm"><span>Delete all rides from the device?</span><button class="b" id="clearYes">Delete</button><button class="b" id="clearNo">Keep</button></div>
+            <ul id="phoneList"></ul>
+            <p style="margin:10px 0 0;color:var(--ink-3);font-size:.8rem">Then in the <a href="https://gt265.github.io/ride-log/" target="_blank" rel="noopener">Ride Log app</a>: Settings → Import → pick the file.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="card" aria-label="Things to check">
+        <h2>Things worth trying</h2>
+        <ol class="notes">
+          <li>Start riding, then press START on the device. Watch distance and moving time count.</li>
+          <li>Ride through a traffic light: the device shows AUTO-PAUSE and moving time stops.</li>
+          <li>Press LAP, or set AUTO_LAP_KM to 1, and check the Laps page.</li>
+          <li>Wake the heart-rate strap and power meter, then look at the Sensors page and zones.</li>
+          <li>Hold START to save, go to the Device page, hold START for Wi-Fi, and download the ride.</li>
+          <li>Flip the power switch mid-ride: the e-paper keeps the last picture, but the unsaved ride is lost.</li>
+        </ol>
+      </section>
+    </div>
+  </div>
+  <footer>Screen drawn with the Adafruit GFX font bitmaps (FreeSans, GNU FreeFont) the firmware uses. Ride maths: a line-by-line port of ride_logic.h, checked against the C++ for identical results.</footer>
+</div>
+
+<script>const GFX_FONTS = {"FreeSans9pt7b":{"bitmap":"///4wN73IAmGQZH/EwTDIMj/iYJhkBAfFNo9HoNAeBcI9Ho1M/BAIDgQ7CDGIMZAxkBsgDkAATwCdwJjBGMEdwg8DgZgzBmB4BgPAzbC2HMGMePE/hMmbMzMxGYjEIxGYzMzMmZMgCV+pQAwwz8wwwzW8MAIRCEQhEIRCAA8ZkLDw8PDw8PDQmY8ET8zMzMzMD4xsHgwGBwcHBgYEAgH+Dxmw8MDBhwHA8PDZjwMGHFiyaNG/hgwYMB/IBAICAfzjAMBgPBsY+AeMZh4DAbzjYPB4NBsY+D/AwIGBAwIGBgYEDAwPjGweDwbGPjGweDwbGPgPGbCw8PDZzsDA8JmPMAAMMAAAGSgAIHHjgwHgHAOAYD/gAAf8ABwDgHAGDhxwIAAPjGweDAYGDgYGAwAAAGAA/AGDgYBhgBmHbsxzxjHmGPMMeYRs5nM94YAAYAAcEAP4AYA8A8AkBmBmBCDDD/CBGBmBsAw/xgzA2BsDYM/xgbAeA8B4G/4H4YZgaA8AYAwBgDAaA2DGGHw/xgzA2A8B4DwHgPAeA8DYM/w/+AwGAwGA/2AwGAwGA/4/8DAwMDA/sDAwMDAwA+DDmBmA8AMAMH8A8A2A2BzDw8QwHgPAeA8B4D//gPAeA8B4DwG////wAYMGDBgwYMHjx4ngMDYMwxjDMG4PwcwwxhjBmBsDMDAwMDAwMDAwMDAwP/gPwH8H+D9BexvY3kTzZ5s8UeOPHGA4HwPweg9h5jxHjPDeG8H4HwOD4GDGAzAbAHgDwB4A8AbAZgMYMD4AP8wbA8DwPBv8wDAMAwDAMAAD4GDGAzAbAHgDwB4A8AbAZhsYMD7AAj/jA7AbAbAbAz/jA7AbAbAbAbAcD8YbA8DwB4B8A4A8DwNhj8A/4YDAYDAYDAYDAYDAYDAwHgPAeA8B4DwHgPAeA8BsGHwwGwNgRBjDGEEYMwZAWA8BwBgwYEw4ZhwzChmJiETMMiYbEwUNAoaBwcDA4CBgGBjDDDBmA8A4AYA8BkBmDDGDmBgwDYGMMMMGYHYDwBgBgBgBgBgBgD/wGAwDAYDAcBgMBgGAwD/wPtttttttuCEEIQQhBCEEIDtttttttvgMGCiRNihgP/AxjB+cbDAYPPbDYbHPcDAYDAbzjYPB4PB4PB8beA8ZsPAwMDAw2Y8AwMDO2fDw8PDw8NnOzxmw8P/wMDDZjw2b2ZmZmZgO2fDw8PDw8NnOwMDxnzAwMDe48PDw8PDw8PDw///wDADMzMzMzMz4MBgMBhMRmNh8OxiMZhsMP///8De9xzwx4Y8MeGPDHhjwx4YwN7jw8PDw8PDw8M8ZsPDw8PDw2Y83nGweDweDweD428wGAwAO2fDw8PDw8NnOwMDA98xjGMYxgA+48DA4DwHw+N+ZvZmZmZnw8PDw8PDw8PHe8GgmMxCIbDQKBwMAMYeOJHEymbTFtCmhxw4wMYAQ2I2HBgcPCZiQ8EhmMxCYbDQOBwMBgMBAwD+DDDBhhggwfw2ZmZuzmZmZjD/////wMZmZmc3ZmZmwGEkOA==","glyphs":[[0,0,0,5,0,1],[0,2,13,6,2,-12],[4,5,4,6,1,-12],[7,10,12,10,0,-11],[22,9,16,10,1,-13],[40,16,13,16,1,-12],[66,11,13,12,1,-12],[84,2,4,4,1,-12],[85,4,17,6,1,-12],[94,4,17,6,1,-12],[103,5,5,7,1,-12],[107,6,8,11,3,-7],[113,2,4,5,2,0],[114,4,1,6,1,-4],[115,2,1,5,1,0],[116,5,13,5,0,-12],[125,8,13,10,1,-12],[138,4,13,10,3,-12],[145,9,13,10,1,-12],[160,8,13,10,1,-12],[173,7,13,10,2,-12],[185,9,13,10,1,-12],[200,9,13,10,1,-12],[215,8,13,10,0,-12],[228,9,13,10,1,-12],[243,8,13,10,1,-12],[256,2,10,5,1,-9],[259,3,12,5,1,-8],[264,9,9,11,1,-8],[275,9,4,11,1,-5],[280,9,9,11,1,-8],[291,9,13,10,1,-12],[306,17,16,18,1,-12],[340,12,13,12,0,-12],[360,11,13,12,1,-12],[378,11,13,13,1,-12],[396,11,13,13,1,-12],[414,9,13,11,1,-12],[429,8,13,11,1,-12],[442,12,13,14,1,-12],[462,11,13,13,1,-12],[480,2,13,5,2,-12],[484,7,13,10,1,-12],[496,11,13,12,1,-12],[514,8,13,10,1,-12],[527,13,13,15,1,-12],[549,11,13,13,1,-12],[567,13,13,14,1,-12],[589,10,13,12,1,-12],[606,13,14,14,1,-12],[629,12,13,13,1,-12],[649,10,13,12,1,-12],[666,9,13,11,1,-12],[681,11,13,13,1,-12],[699,11,13,12,0,-12],[717,17,13,17,0,-12],[745,12,13,12,0,-12],[765,12,13,12,0,-12],[785,10,13,11,1,-12],[802,3,17,5,1,-12],[809,5,13,5,0,-12],[818,3,17,5,0,-12],[825,7,7,8,1,-12],[832,10,1,10,0,3],[834,4,3,5,0,-12],[836,9,10,10,1,-9],[848,9,13,10,1,-12],[863,8,10,9,1,-9],[873,8,13,10,1,-12],[886,8,10,10,1,-9],[896,4,13,5,1,-12],[903,8,14,10,1,-9],[917,8,13,10,1,-12],[930,2,13,4,1,-12],[934,4,17,4,0,-12],[943,9,13,9,1,-12],[958,2,13,4,1,-12],[962,13,10,15,1,-9],[979,8,10,10,1,-9],[989,8,10,10,1,-9],[999,9,13,10,1,-9],[1014,8,13,10,1,-9],[1027,5,10,6,1,-9],[1034,8,10,9,1,-9],[1044,4,12,5,1,-11],[1050,8,10,10,1,-9],[1060,9,10,9,0,-9],[1072,13,10,13,0,-9],[1089,8,10,9,0,-9],[1099,9,14,9,0,-9],[1115,7,10,9,1,-9],[1124,4,17,6,1,-12],[1133,2,17,4,2,-12],[1138,4,17,6,1,-12],[1147,7,3,9,1,-7]],"first":32,"last":126,"yAdvance":22},"FreeSansBold12pt7b":{"bitmap":"/////3ZmYP/w8/z/P89hmGAOcHODGP/3/7/8c4MYGMf/v/3/4xg5wc4OcAIAfg/4f+evuT3ID0A/AP8A/AX/J/k/6+/+P+B8AIAEADwGD8GB/DBzjAwxgc5gH8wD8wA8Z4AZ+AJ/gM5wEYYGOcGH+DB+DAeAB4AfwD/gPOA84D7gD8AHAD+Mf8zx/PD48Hj4+H/8P94fjv//ZgxzjnHHOOOOOOOOHHHDjhhww4ccOOOHHHHHHHHOOOccY4AQI1/zhxsUDgHAOAcP////+HAOAcA4AP/zNsD//8D/8AwwhhhhDDDCGGGEMMAfg/x/557w/w/w/w/w/w/w/w/w955/4/wPAAYcf//jx48ePHjx48ePHh+D/H/vn/D/DwDwDwHgPA+B4DwDgH/3/3/wHwf8/+8e8eAeA8B4B8AeAPAP8P8ff+f8H4ADwPgfB+G8J4zzHmPYe/////4HgPAeA8A/5/5/5wBgBvh/z/7x8A8A8A8A/h7/5/w/AA+D/H/nn/APeP/P/vn/D/D/D/D3n3/j/A+A/////4DgHAcB4DgPAcB4DwHgOA8B4DwADwP8f8eecOcOOcH4P8ee8P8P8P+ff+P8H4AfA/x/757w7w/w/w/59/8/8e8A7x5/5/wfAP/wAAAP///wAAAP/xFsABAHA/H8fg+A4A/AP4B/APAD//////AAAAAA//////AADgD8B/AP4B8A8H8fj+DwCAAfB/x/75/w/w8A8A8B4DwHgPAOAOAAAPAPAPAA/gAf/APA8DgBw4AHGD2Zh+xsccPDBh4YMPGBh4wYfGDDY447j9+MPPBwAAHAAAeAgB/+AB/AAAPgA+AD4AfwB/AHcA94DngOOB48HDw//D/+P/54DngPcA/wB//D/8//PD7we8HvD7/8/+P/zwe8D/A/wP8H//7/+/+AB+Af+D/8fD54H/gP8ADwAPAA8ADwAPAA+A94H3w+P/4f/Afw/+H/4//ng+8D3gf8B/gP8B/gP8B/gP8D/ge8H3/8//H/gP/3/7/94A8AeAPAH/z/5/88AeAPAHgDwB//////wP//////APAPAPAP/v/v/vAPAPAPAPAPAPAPAAPwD/w//j4feAd4APAA8ADwf/B/8H/wB3gHfA8+Hz/7D/sD4/A/wP8D/A/wP8D/A////////wP8D/A/wP8D/A/wP8Dw////////////AeA8B4DwHgPAeA8B4DwH+P8f4/x7/n/D4PA+8DzwePDw8eDzwPeA/wD/gP+A+8Dx4PDw8PDwePA88D7wHvAeA8B4DwHgPAeA8B4DwHgPAeA8B/////z4H/4P/w//h//D/+H/+f/87/53+zv93f78/35/nz/Pn+eP88f448DwH/A/8H/g/+H/w/3H+4/zn+c/x3+P/w/+H/wf+B/wP+A8A+AP/A//h8fHgPPAe8Af4A/wB/gD/AH+APeA88B48Ph//B/8A/gA/+P/7/+8H/A/wP8D/B//+//P/jwA8APADwA8APADwAAD4A/8D/+Hx8eA88B7wB/gD/AH+AP8Af4E94fzw/jw+H/8H/+D8YAAAP/4//z//PA+8B7wHvAe8Dz/+P/w//jwPPA88DzwPPA88DzwHw/Af+H/58PvA94APAB/AH/wP/gP+AHwAf4D3g+//j/4H8D/////8PAPAPAPAPAPAPAPAPAPAPAPAPAPAPDwP8D/A/wP8D/A/wP8D/A/wP8D/A/wP8D3h5/+P/A/AHAO8D3gecDjgceHhw4OHB54HOA5wHOAfgD8AfgB4APAB4BwOBzg8Hnh8PPD4eOHw4cPhw47nh53OBzucDnM4HOZwG4/APx+Afj8A/D4A+HgB4PADweA8Dzw+eHh54PPA/wD8AfgB4APAD8A/wH+B54PHjw8+D3gePAeeB54PDw8PHgeeA5wD/AH4AfgA8ADwAPAA8ADwAPAA8ADwP/////+AfAPAPAPAPgHgHgHgHwDwDwDwB//////wP///PPPPPPPPPPPPPPPPP//wMGBAwYEDBgQMGBAwYEDBv//zzzzzzzzzzzzzzzzz///wA8A8A8B+BuDnDnDDHDnDuBw/////OYwH4P/H/3h4A8D+f/fHvD3j7/8/+PPgPAHgDwB4A8Ae8P/n/7494P8H+D/B/g/49/+/+e+AA+D/n/3j/B/APAPAPB3j3/z/g+AAHgDwB4A8AePvP/v/3j/g/wf4P8H+D3j7/8/+PvAH4H+H/nxzwd/+//eAPADw5/8f8D4AD79+8efvzx48ePHjx48ePAeefvf/vH/B/g/wf4P8H/H3/5/8feAPAH/Hn/w/gDwDwDwDwDwD3z/7//5/w/w/w/w/w/w/w/w/w//8A////////8888AA88888888888888///4DwDwDwDwDwDw/x7zz3j/D/D/j/jzzxzx7w7w/////////////3j5/7+////Pj/Hh/jw/x4f48P8eH+PD/Hh/jw/x4e98/+//+f8P8P8P8P8P8P8P8P8PAPgf8f/PHvB/g/wf4P8HvHn/x/wPgA98f/P/3x7wf4P8H+D/B/x7/9/894eAPAHgDwB4AAD3n/3/7x/wf4P8H+D/B7x9/+f/H3gDwB4A8AeAPA8/f/+PDw8PDw8PDw8B+H/P/vD/gP8H/g/wH/D//n/h+Aeee//eeeeeeeffPA8P8P8P8P8P8P8P8P8P8f//f/PvDwe4OeHPHjjhxwd4O4HcB+A+AfAHAA8OHceHcfPefPebOObOO7OO78Hz8Hx8Hx8Hx4Dh4AePPHj3g7gfwHwB4B8B/A7w948eeHAPB7g54cceOOHnBzg7gfwH4D4A8AcAOAPAfAPgHgAP////wPB4PB4PB4PA/////AHPPOOOOOOOO88OOOOOOOPPHA///////w448ccccccccPPccccccc884AeA/gzzB/AeA=","glyphs":[[0,0,0,7,0,1],[0,4,17,8,3,-16],[9,10,6,11,1,-17],[17,13,16,13,0,-15],[43,13,20,13,0,-17],[76,19,17,21,1,-16],[117,16,17,17,1,-16],[151,4,6,6,1,-17],[154,6,22,8,1,-17],[171,6,22,8,1,-17],[188,7,8,9,1,-17],[195,11,11,14,2,-10],[211,4,7,6,1,-2],[215,6,3,8,1,-7],[218,4,3,6,1,-2],[220,6,17,7,0,-16],[233,12,17,13,1,-16],[259,7,17,14,3,-16],[274,12,17,13,1,-16],[300,12,17,13,1,-16],[326,11,17,13,1,-16],[350,12,17,13,1,-16],[376,12,17,13,1,-16],[402,11,17,13,1,-16],[426,12,17,13,1,-16],[452,12,17,13,1,-16],[478,4,12,6,1,-11],[484,4,16,6,1,-11],[492,12,12,14,1,-11],[510,12,9,14,1,-9],[524,12,12,14,1,-11],[542,12,18,15,2,-17],[569,21,21,23,1,-17],[625,16,18,17,0,-17],[661,14,18,17,2,-17],[693,16,18,17,1,-17],[729,15,18,17,2,-17],[763,13,18,16,2,-17],[793,12,18,15,2,-17],[820,16,18,18,1,-17],[856,14,18,18,2,-17],[888,4,18,7,2,-17],[897,11,18,14,1,-17],[922,16,18,17,2,-17],[958,11,18,15,2,-17],[983,17,18,21,2,-17],[1022,15,18,18,2,-17],[1056,17,18,19,1,-17],[1095,14,18,16,2,-17],[1127,17,19,19,1,-17],[1168,16,18,17,2,-17],[1204,15,18,16,1,-17],[1238,12,18,15,2,-17],[1265,14,18,18,2,-17],[1297,15,18,16,0,-17],[1331,23,18,23,0,-17],[1383,15,18,16,1,-17],[1417,16,18,15,0,-17],[1453,13,18,15,1,-17],[1483,6,23,8,2,-17],[1501,7,17,7,0,-16],[1516,6,23,8,0,-17],[1534,12,11,14,1,-16],[1551,15,2,13,-1,4],[1555,4,3,6,0,-17],[1557,13,13,14,1,-12],[1579,13,18,15,2,-17],[1609,12,13,13,1,-12],[1629,13,18,15,1,-17],[1659,13,13,14,1,-12],[1681,7,18,8,1,-17],[1697,13,18,15,1,-12],[1727,12,18,14,2,-17],[1754,4,18,7,2,-17],[1763,6,23,7,0,-17],[1781,12,18,14,2,-17],[1808,4,18,6,2,-17],[1817,19,13,21,2,-12],[1848,12,13,15,2,-12],[1868,13,13,15,1,-12],[1890,13,18,15,2,-12],[1920,13,18,15,1,-12],[1950,8,13,9,2,-12],[1963,12,13,13,1,-12],[1983,6,15,8,1,-14],[1995,12,13,15,2,-12],[2015,13,13,13,0,-12],[2037,18,13,19,0,-12],[2067,13,13,13,0,-12],[2089,13,18,13,0,-12],[2119,10,13,12,1,-12],[2136,6,23,9,1,-17],[2154,2,22,7,2,-17],[2160,6,23,9,3,-17],[2178,12,5,12,0,-7]],"first":32,"last":126,"yAdvance":29},"FreeSansBold18pt7b":{"bitmap":"/////////uc5znOAD///+Pj/x/4/8f+P/H3Bzg5wcAPDgDx4A8eAOHgHhwf//3//9///f//w8OAPDgDx4A8eAOHg///P//z//8///Bw8A8OAPHgDx4A4eAOHgABgAH+AP/wP/8P//Pzfnxn7wx94Y++MAf2AH/AB/8Af/gB/4AP+AGfgDH/hj/wx/8Y+/N+f//H//A//AH+AAYAAMAAGAA8AHAH+AOAf+A4A/8BwDw8HAHA4OAOBw4AcDjwA8PHAA/8cAB/44AB/jgAA8HD4AAcf8AA5/8ADj/4AHPB4AccBwAw4DgDhwHAGDweAcD/4BwH/wDgH/AOAD4AB8AAf4AD/wAP/gB8eAHx4AfHgB+eAD7wAH+AAPwAB+AAf8PD/48fnzz8P+Pg/4+B/j4D8PwPwfj/h//+D//8H/n4H8Pz////9znAHh4PDweHg8Hh4PB4eDweDweDweDweDwOB4PB4Hg8DgeBwPA4HgPA4HgeDwPB4PA8Hg8DweDweDweDweDweHg8Hg8PB4eDwcHg4PAABgBgBgduf+P8DwH4H4OcEIADwAPAA8ADwAPAA8D//////////wPAA8ADwAPAA8ADwP///4xjN7D/////8P///4ABgcDAYHA4GAwOBgMBgcDAYDA4GAwOBwMBgcDAAAfwD/4P/4f/x+Pz4PnwffAf+A/8B/4D/wH/gP/Af+A/8B/4D/wH3wfPg+fj8f/w//g/+AfwAAHA8DwfH/////8HwfB8HwfB8HwfB8HwfB8HwfB8HwfAB/AP/g//j//n4/fg/+A/8B/4D4AHwAfgA+AD8APwB/AH8AfgB+AHwAfAA+AD//3//v//f/+AB+AP/A//D//Pw/fA++B98D4AHwAfAA+AP4AfwA/wAPwAPwAP/Af+A/+D98Pz//j/+D/4B/AAAPwA/AH8AfwD/Ad8B3wOfA58HHwYfDh8cHxgfOB8//////////8AfAB8AHwAfAB8AHwf/w//j//H/+PAAeAA4ABwAHnwP/4f/4//58PwAPwAPgAfAA+AB/4D/wP/w/P/8f/4P/AH4AAD+AP/gf/w//4+H58D58AD4AD4+D7/j//z//7+H78D/4B/4B/4B/4B94B98D5+H4//wf/wP/AD8AD///////////AA8AD4APgAeAB8ADwAPgAeAB8ADwAPgAfAA8AD4AHwAPgAeAB8AD4AHwAPgAAH4Af8D/8H/8fD88D54DzwHngfHh8H/wH/A//j8fnwffAf+A/8B/4D/4P3w/P/+P/4P/gH8AAH4A/8D/8P/8fj9+D74D3wH/gP/Af+A/+D9+P7//z//j/fB8+AB4AD3wPnw+P/8P/wP/AH4AD///+AAAAAAH///8D///+AAAAAAH///8Yzm9gAAMAA8AH8A/8D/wf+D/wD+ADwAD+AD/wAf+AH/wA/8AH8AB8AAMD///////////AAAAAAAAAAAP//////////8MAAPAAP4AP/AD/wAf+AD/wAfwADwAfwD/wf+D/4P/AP4APAAMAAAAfwB/8D//H//H4/vwP/gH/gH/gHwAPwAfwA/gB/AD+AH8AHwAPgAPAAPAAAAAAAAPgAPgAPgAPgAPgAAAf8AAA//wAA///AAfgH8APgAfgHgAB8DwAAPB4D4548D/eOOB//Dng+HwdwOA8HcHgPB+BwDgfgcA4H4OAOB+DgHg/g4BwO4OA8HuDwPDzw8Px8cH//+Hg/z/A8HwfAPgAAAB8AAAAPwAEAB/APAAP//wAA//8AAB/4AAB+AAB/AAB/AAD/AAD/gAH/gAH/gAH3wAPnwAPnwAPj4AfD4AfD4AfB8A+B8A+B8A//+B//+B///B///D4AfD4Afj4APnwAPnwAP3wAH//8D//w//+P//z4B++APvgD74A++APvgD74B8//+P//D//4///PgH74Ae+AH/gB/4Af+AH/gD7//+///P//j//gAP8AB/+AP//A///D+B+H4B+fgB8+AB98AD/wAAPgAAfAAA+AAB8AAD4AAHwAAPgAAPgAffAA+/AD8/APx/A/h//+B//4A//AAf4A//wH//g//+H//4+A/nwB8+AH3wA++AH3wAf+AD/wAf+AD/wAf+AD/wAf+AD/wA/+AH3wA++APnwH8///H//w//8H/+AA///f//v//3//74AB8AA+AAfAAPgAHwAD4AB//8//+f//P//nwAD4AB8AA+AAfAAPgAHwAD////////////z///////////+AB8AD4AHwAPgAfAA+AB//7//3//v//fAA+AB8AD4AHwAPgAfAA+AB8AD4AHwAAAB/gAP/4Af/+A///B/A/j8Afn4AP3wAH3wAAPgAAPgAAPgAAPgD//gD//gD//gD//wAD3wAH3wAH34APz8Afx/B/w///wf/5wP/xwD/B/gB/4Af+AH/gB/4Af+AH/gB/4Af+AH/gB//////////////+AH/gB/4Af+AH/gB/4Af+AH/gB/4Af+AH/gB/4Af/////////////////////8AAHwAfAB8AHwAfAB8AHwAfAB8AHwAfAB8AHwAfAB8AH/gf+B/4H/gf+B/8P3/+P/wf+Afg+AH74A/PgH4+A/D4H4Pg/A+H4D4/APj4A+fgD78AP/gA//AD/+AP/4A/vwD8fgPg/A+B+D4H4PgPw+Afj4B/PgD8+AH74APw+AB8AD4AHwAPgAfAA+AB8AD4AHwAPgAfAA+AB8AD4AHwAPgAfAA+AB8AD4AHwAP//////////8D/AP//AP//AP//Af//gf//gf//gf//gf/7w9/7w9/7w9/7w9/5x9/555/555/555/555/4/x/4/x/4/x/4/x/4fx/4fh/4fh/4fh/4Ph/4Af/AH/4B/+Af/wH/8B//gf/4H//B/7wf++H/nx/58f+Pn/h5/4ff+D3/g//4H/+B//gP/4D/+Af/gD/4A/+AHwB/AAH/8AH//AP//wH8H8H4A/H4APz4AD58AB98AAf+AAP/AAH/gAD/wAB/4AA/8AAf+AAPvgAPnwAHz8AH4/AH4P4P4H//4A//4AP/4AA/gAD//B//4//+f//vgP/wD/4A/8Af+AP/AH/gH/wH7//9//8//8f/4PgAHwAD4AB8AA+AAfAAPgAHwAD4AB8AAAB/AAH/8AH//AP//wH8H8H4A/H4APz4AD58AB98AAf+AAP/AAH/gAD/wAB/4AA/8AAf+AEPvgHPnwH/z8B/4/Af4P4P8H//+A///gP/74A/w4AAAID//wf//j//+f//z4A/fAD74AffAD74AffADz4A+f//j//4f//D//8fAPz4A+fAHz4A+fAHz4A+fAHz4A+fAHz4A/fAD8AH+AH/8D//h//8fg/PwH74A++APvgAD8AA/wAH/8A//4H//AP/4AH/AAPwAB/4Af+AH/wD/+B+f//j//wf/wA/wP////////////AfAAPgAHwAD4AB8AA+AAfAAPgAHwAD4AB8AA+AAfAAPgAHwAD4AB8AA+AAfAAPgAHwAD4A+AH/gB/4Af+AH/gB/4Af+AH/gB/4Af+AH/gB/4Af+AH/gB/4Af+AH/gB/4Af+AH/gB98A+fgfj//w//8D/8AP8D4APvgA+fAH58AfHwB8PgHw+A+D4D4HgPgfB8B8HwDwfAPh4A+PgD4+AHjwAfPAB98AD3gAP+AA/4AB/AAH8AAfwAA+AAD4AD4B8A/+AfgPvwH4D58D+A+fA/gfnwP4Hx8D/B8Pg/wfD4e8Hg+HnD4Hh5w+B4eePgfHnjwHzx48A88OfAPPD3wDzw94A+8PeAH+D3gB/gf4Af4H8AD+B/AA/gfwAPwD4AD8A+AAfAPgP4B+fgH4/A/D8D4H4fgfj8A/PwB9+AH/wAP/AA/4AB/AAD8AAfwAB/gAP+AA/8AH34A/PgD4/Afh8B8H4PwPx+A/H4B+/AH8PwB/+APnwD8/AfD4H4fg+B8HwPx8A+PgH74AffAD/wAP+AA/gAH8AAfAAD4AAfAAD4AAfAAD4AAfAAD4AAfAAD4AAfAAP////////////AAfgAfgAfgAPwAPwAPwAP4AH4AH4AH4AH8AD8AD8AD8AB+AB+AB+AB/AA////////////8//////j4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj/////4DgGAYBwDAMA4BgGAcAwDAMA4BgGAcAwDAOAYBgHAcD/////Hx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fH/////8D4AfgB+AP8A/wD3geeB54PDw8PDweeB54HnAP8A///////////vjw8ODgB/gH/4P/8f/+fB++A+AA+AH+D/+P/+f4+/A++A++B+/D+//+f/+P+/H4/PgAPgAPgAPgAPgAPgAPgAPn4Pv8P//P//P4fvwPvwP/gH/gH/gH/gH/gH/wP/wPv4fv//P//Pv8Pn4AA/AH/g//h//n4fvgf+A/8AD4AHwAPgAfAA+A++B9+H5//j/+D/4A/AAAA+AAfAAPgAHwAD4AB8AA+B8fD/vj//z//7+P98B/+A/+AP/AH/gD/wB/4A/+A/fAfvw/z//4//8P++D8fAfgB/4D/+D/+H4fHwPPgPvgHv//v//v//vgAPgAPwPn4fn//D/+B/8AfwAPx/P8/z4Pg+P+/7/j4Pg+D4Pg+D4Pg+D4Pg+D4Pg+D4AHx8P98//8//9+H98D/8D/4B/4B/4B/4B/4B/8D98D9+H9//8//8f98Hx8AB8AB/8D9+H5//w//gH+APgAfAA+AB8AD4AHwAPgAfHw+/5//7//38P/wP/Af+A/8B/4D/wH/gP/Af+A/8B/4D/wH/gP/AfA///wAB///////////////8A+fPnwAAAfPnz58+fPnz58+fPnz58+fPnz///++PgAfAA+AB8AD4AHwAPgAfA++D58Pz4/Hz8PnwffA/+B/8D/8H/4P34fHw+Hx8Pz4PnwfvgffA/A/////////////////////8D4+D8ff5/z////f////8P4f/g/B/4HwP/A+B/4HwP/A+B/4HwP/A+B/4HwP/A+B/4HwP/A+B/4HwP/A+B/4HwPgPj4ff8//9//7+H/4H/gP/Af+A/8B/4D/wH/gP/Af+A/8B/4D/wH/gPgA/gB/8B//B//x/D8+A+/Af/AH/gD/wB/4A/8Af/AfvgPn4fx//wf/wH/wA/gAPj4Pv+P//P//P4fvwPvwP/gH/gH/gH/gH/gH/wP/wPv4fv//P//Pv8Pj4PgAPgAPgAPgAPgAPgAPgAAB+Ph/3x//5//9/H++A//Af/AH/gD/wB/4A/8Af/AfvgP34P5//8//+H/fB+PgAHwAD4AB8AA+AAfAAPgAHz4/3/////h+D4HwPgfA+B8D4HwPgfA+B8D4AAH8A/+D/+H/+fh8+B5+AD/gD/8H/+D/8A/8AH/wH3wfv/+P/8P/wH+AD4fD4fD5////z4fD4fD4fD4fD4fD4fz+Pw++A/8B/4D/wH/gP/Af+A/8B/4D/wH/gP/Af+A/8D/8P///3//n/fH4+B8B8+A+fAfHwfD4Ph8HweDwPj4Hx8B48A+eAffAHvAD/gB/wAfwAP4AH8AB8AA/B8D74PgffB+Hz4Pw+PD+Hx8fw8Pj/Ph8d58HnvPg+854H3nPAe4/4D3H+Af4/wD/D+APwfwB+D8APwfgA+D8AD8H58H5+Pw+PgffgffAP+AH+AH8AD4AH8AP+AP+AffA/fg+Ph+Px8H78D4fAPvgPn4Hx8D4+D4fB8Hw+D4eA8fAfPAPngD3wB/wA/4AP8AH8AB+AA/AAfAAPgAHgAHwAf4AP4AH4AD4AB//n/+f/5//gB+APwB+APwA/AH4A/AH4A/AH4A/gD//////////weHx+Px4PB4PB4PB4PB4PD5+PB+D4PB4PB4PB4PB4PB4Px+HweA////////////////4PB8Ph+DweDweDweDweDweDwfB+Dx+fDweDweDweDweDx+Ph8PAAPAD+D/4eH/wPwA8A","glyphs":[[0,0,0,10,0,1],[0,5,25,12,4,-24],[16,13,9,17,2,-25],[31,20,24,19,0,-23],[91,19,29,19,0,-25],[160,29,25,31,1,-24],[251,22,25,25,2,-24],[320,5,9,9,2,-25],[326,9,33,12,1,-25],[364,9,33,12,1,-25],[402,12,11,14,0,-25],[419,16,16,20,2,-15],[451,5,11,9,2,-4],[458,9,4,12,1,-10],[463,5,5,9,2,-4],[467,9,25,10,0,-24],[496,17,25,19,1,-24],[550,10,25,19,3,-24],[582,17,25,19,1,-24],[636,17,25,19,1,-24],[690,16,25,19,2,-24],[740,17,25,19,1,-24],[794,18,25,19,1,-24],[851,17,25,19,1,-24],[905,17,25,19,1,-24],[959,17,25,19,1,-24],[1013,5,18,9,2,-17],[1025,5,24,9,2,-17],[1040,18,17,20,1,-16],[1079,17,12,20,2,-13],[1105,18,17,20,1,-16],[1144,18,26,21,2,-25],[1203,32,31,34,1,-25],[1327,24,26,24,0,-25],[1405,20,26,25,3,-25],[1470,23,26,25,1,-25],[1545,21,26,25,3,-25],[1614,19,26,23,3,-25],[1676,17,26,22,3,-25],[1732,24,26,27,1,-25],[1810,20,26,26,3,-25],[1875,5,26,11,3,-25],[1892,16,26,20,1,-25],[1944,22,26,25,3,-25],[2016,17,26,22,3,-25],[2072,24,26,30,3,-25],[2150,20,26,26,3,-25],[2215,25,26,27,1,-25],[2297,19,26,24,3,-25],[2359,25,27,27,1,-25],[2444,21,26,25,3,-25],[2513,20,26,24,2,-25],[2578,19,26,23,2,-25],[2640,20,26,26,3,-25],[2705,22,26,23,1,-25],[2777,32,26,34,1,-25],[2881,22,26,24,1,-25],[2953,21,26,22,1,-25],[3022,19,26,21,1,-25],[3084,8,33,12,2,-25],[3117,10,25,10,0,-24],[3149,8,33,12,1,-25],[3182,16,15,20,2,-23],[3212,21,3,19,-1,5],[3220,7,5,9,1,-25],[3225,18,19,20,1,-18],[3268,18,26,22,2,-25],[3327,17,19,20,1,-18],[3368,19,26,22,1,-25],[3430,18,19,20,1,-18],[3473,10,26,12,1,-25],[3506,18,26,21,1,-18],[3565,17,26,21,2,-25],[3621,5,26,10,2,-25],[3638,7,33,10,0,-25],[3667,17,26,20,2,-25],[3723,5,26,9,2,-25],[3740,27,19,31,2,-18],[3805,17,19,21,2,-18],[3846,19,19,21,1,-18],[3892,18,26,22,2,-18],[3951,19,26,22,1,-18],[4013,11,19,14,2,-18],[4040,17,19,19,1,-18],[4081,9,23,12,1,-22],[4107,17,19,21,2,-18],[4148,19,19,19,0,-18],[4194,27,19,27,0,-18],[4259,18,19,19,1,-18],[4302,19,26,19,0,-18],[4364,16,19,18,1,-18],[4402,9,33,14,1,-25],[4440,3,33,10,4,-25],[4453,9,33,14,3,-25],[4491,15,6,18,1,-10]],"first":32,"last":126,"yAdvance":42},"FreeSansBold24pt7b":{"bitmap":"////////////////3z58+fPnxw4cAAAH///////8/h//h//h//h//h//h//h/fA+fA+fA+OAcOAcAPg+AD4PgA+D4APg+AD4fAB8HwAfB8H///9////f///3///9////A+D4APg+AD4fAB8HwAfB8AHwfAB8HwP///z///8////P///z///8D4fAB8HwAfB8AHwfAB8HwAfD4APg+AD4PgA+D4AAADgAABwAAH/gAP/8AP//gP//4P//+H9z/n84/z8cP9+OD+/HB/fjgAP5wAH+4AB/8AA//AAP/8AD//wAf/+AD//gAf/4AOf8AHH/ADh//xwf/44P/8cH/+OH+/nD+f7n/H///D///A///AH/+AA/4AADgAABwAAA4AAAcAAD4AA8AB/wAHgAf/gB4AH/8APAB//wDwAPg+AeAD4D4HgAeAPA8ADwB4PAAeAPB4AD4D4eAAPg+DwAB//w8AAH/8HgAAf/B4AAB/wfAAAD4DwAAAAA8B8AAAHg/4AAB4f/wAAPD/+AADw//4AAePwfAAHh8B8AA8PAHgAPB4A8AB4PAHgAeB8B8ADwHwfAA8A//4AHgD/+AB4Af/gAfAA/4ADwAB8AAD8AAAP+AAAf/AAA//gAB//wAD/PwAD+HwAD+HwAD+HwAD/HwAB/PgAB//gAA//AAAf+AAAP8AAAf4AAB/8D4D/+D4P/+D4f8/H4fwfn4/wf/w/gP/w/gH/w/gH/g/gD/g/wD/A/4H/gf8P/wf///wP///4H//v8D//H+B/+D+AP4AAA////////vnz44cAA8A+A+AfAfAfgPgPwH4D4D8B+B+A/AfgPwPwH4D8B+A/AfgPwH4D8B+A/APgH4D8B+AfAPwH4B8A/APgH4B8A+APgHwB8AeB4A+APgHwB8A+APgHwD8A+AfgPwD8B+A/AfgH4D8B+A/AfgPwH4D8B+A/AfgPgPwH4D8B8B+A/AfAfgPgPwHwH4D4D8B8B8AADgAcADgAcBjjf////n/4HwB/AP4D3g8eHjwIIAAB8AAD4AAHwAAPgAAfAAA+AAB8AAD4A///////////////////////AHwAAPgAAfAAA+AAB8AAD4AAHwAAPgAD///////+HDhx47984AP////////////z///////+AADgDwBwA4AcAcAOAHAHgDgBwA4A4AcAOAPAHADgDwBwA4AcAcAOAHAHgDgBwA4A4AcAOAPAHAAAA/wAD/8AP//Af//gf//g///w/w/x/gf5/AP5/AP5/AP7+AH/+AH/+AH/+AH/+AH/+AH/+AH/+AH/+AH/+AH/+AH/+AH/+AH9/AP5/AP5/AP5/gf4/w/w///wf//gf//gP//AD/8AA/wAAPAHwB8A/Afw///////////AfwH8B/AfwH8B/AfwH8B/AfwH8B/AfwH8B/AfwH8B/AfwH8B/AfwH8Af4AD/+AP/+A//+D//+P//+f4P9/gP/+Af/8Af/4A//wB/AAD+AAH8AAf4AA/gAD/AAP8AB/wAH/AAf4AD/gAP8AA/wAD/AAP8AAfwAB/AAD///n///f//+///9///7///wB/gAP/4B//4H//4f//4///x/h/3+B/v4B/fwD+/gH8AAP4AAfgAB/AAH8AB/wAD/AAH/AAP/gAD/gAB/AAD/AAD+AAH8AAP/8Af/4B//4D/f4P8///5///h//+B//4A//gAf4AAAf4AB/gAP+AA/4AH/gA/+AD/4Ae/gB7+APP4B4/gHj+A8P4Dg/geD+BwP4PA/h4D+HAP48A/j/////////////////////8AD+AAP4AA/gAD+AAP4AA/gAD+Af//w///h///D//+P//8f//4+AAB8AAD4AAHgAAfH4A+/+B//+D//+H//+f//8/gf8AAf4AAf4AAfwAA/gAB/AAD+AAH8AAP/4A//4D/f4P+///4///w///A//4A//gAP4AAD/AAf/gB//wH//gf//h///j/D/P8D+fwAA/gAB/AAH8AAP4/Af3/g///x///z///n/h/v8B/f4D//gD//AH/+AP/8Af34A/vwB/fwH+/gP4/x/x///B//+D//4D//gB/+AA/gA///////////////////////AAD8AAPwAA/gAB+AAH4AAfwAA/AAD+AAH4AAfgAB/AAD+AAH4AAfwAA/AAD+AAH8AAPwAAfgAB/AAD+AAH8AAPwAA/gAB/AAD+AAH8AAA/gAD/8AP/+Af//A///g///h/g/x/APx+APx+AHx+AHx+APw/APg/g/gP//AH/8AP//Af//g/w/x/AP5/AP7+AH/+AH/+AH/+AH/+AH//AP//AP5/g/5///4///wf//gP//AH/8AA/wAA/wAD/8AP/+Af//A///g///x/w/x/Af7/AP7+AH7+AH7+AH/+AH/+AH/+AH//AP9/Af9/w/9///8///8f//8P/38H/n8B/H4AAH4AAP4AAP5/Afx/g/x///g///g///Af/+AH/4AB/gD///////+AAAAAAAAAAAAD///////+////////gAAAAAAAAAAAA////////hw4cee/fOAAAAIAADwAAfgAH/AB/+AP/8D//A//wH/8Af/AA/wAB8AAD+AAH/gAP/4AD/+AB//gAf/4AH/4AD/wAA/gAAPAAACA///////////////////////AAAAAAAAAAAAAAAAAAAAAAA///////////////////////IAAAcAAA/AAB/wAD/4AH/+AB//gAf/wAH/8AB/8AAf4AAPwAB/gAf/AD/+A//gP/4D//AP/wAf8AA/gAB4AACAAAAAB/gAH/8Af//A///g///x///x/g/5/Af7/AP/+AH/+AH/+AH8AAH8AAP8AAf4AA/4AB/wAD/gAP/AAP+AAf4AAfwAA/gAA/AAA/AAAAAAAAAAAAAAA/gAA/gAA/gAA/gAA/gAA/gAA/gAAAB/wAAAAP//gAAAf//8AAA////gAA/4B/4AB/gAH+AB/gAA/gB/AAAP4B/AAAB8A/AAAAfA/AAAAPg/AB+PD4fAD/vg8fgH//wePgH4fwHvwH4H4D3wD4B8B74D4A8A/8B4AeAf8B8APAP+A8AHgH/AeADgH/gfADwD/wPgB4B74HwA4B98D4A8A8/B8A+A+Pg/A/A+HwPw/x/D8H////A/B/+//Afwf+P+AH8D8B8AB/AAAAAAfwAAAAAH+AAAAAB/4AGAAAf///gAAD///wAAAf//wAAAA/+AAAAAP+AAAD/gAAA/4AAAf/AAAH/wAAB/8AAA//gAAP/4AAD9+AAB/fwAAf38AAH4/AAD+P4AA/j+AAfwfgAH8H8AB+B/AA/gP4AP4D+AD8A/gB/AH8Af///AH///wD///+A////gf///4H////B/AAfw/gAH8P4AA/j+AAP5/AAD+fwAAf38AAH///+Af//+D///4f///j///+f///z+AH/fwAf7+AB/fwAP7+AB/fwAfz+AH+f///j///4f//8D///4f///j///+fwAf7+AB/fwAH/+AA//wAH/+AA//wAH/+AB//wAf7////f///z///+f///j///wf//wAAB/wAAP/+AAf//gB///wD///4D///8H/gf8P+AH+P8AH+f4AD+f4AB/fwAB/fwAAA/gAAA/gAAA/gAAA/gAAA/gAAA/gAAA/gAAA/gAAA/gAAA/gAAAfwAAAfwAB/fwAB/f4AD/P8AD+P+AH+H/gf8D///8D///4B///wAf//gAP/+AAB/wA///AD///gP///A///+D///8P///4/gD/z+AD/P4AH+/gAf7+AA/v4AD+/gAH/+AAf/4AB//gAH/+AAf/4AB//gAH/+AAf/4AB//gAH/+AA/v4AD+/gAf7+AB/v4AP8/gD/z///+P///w///+D///wP//+A///AD///9///+////f///v///3///7+AAB/AAA/gAAfwAAP4AAH8AAD+AAB///8///+f///P///n///z///5/AAA/gAAfwAAP4AAH8AAD+AAB/AAA/gAAfwAAP////////////////////////wP////////////////////////4AAP4AAP4AAP4AAP4AAP4AAP4AAP///P///P///P///P///P///P4AAP4AAP4AAP4AAP4AAP4AAP4AAP4AAP4AAP4AAP4AAP4AAP4AAP4AAP4AAAAP+AAA//4AB///AB///wB///8B////B/4D/w/wAf4/wAH8fwAB/f4AA/v4AAAH8AAAH8AAAD+AAAB/AAAA/gA///wAf//4AP//8AH//+AD///AB///wAAfv4AAP38AAH7/AAH8/wAD+f8AD/H/AD/j/4P/w////4P//98D//+eA//+PAH/8HgAf4AA/gAP/8AB//gAP/8AB//gAP/8AB//gAP/8AB//gAP/8AB//gAP/8AB//gAP////////////////////////////8AB//gAP/8AB//gAP/8AB//gAP/8AB//gAP/8AB//gAP/8AB//gAP/8AB//gAP/8AB/P///////////////////////////////////////AAB/AAH8AAfwAB/AAH8AAfwAB/AAH8AAfwAB/AAH8AAfwAB/AAH8AAfwAB/AAH8AAfwAB/AAH8AAfwAB//gH/+Af/4B//gH/+Af/8D//4f9///n//+P//wf/+A//wAf4AD+AA/z+AB/j+AD/D+AH+D+AP+D+Af8D+Af4D+A/wD+B/gD+D/AD+H+AD+P8AD+f4AD+/wAD//gAD//wAD//wAD//4AD//8AD/3+AD/j/AD/D/AD+B/gD+A/wD+Af4D+Af8D+AP8D+AH+D+AD/D+AD/j+AB/j+AA/z+AAf7+AAf8P4AAfwAA/gAB/AAD+AAH8AAP4AAfwAA/gAB/AAD+AAH8AAP4AAfwAA/gAB/AAD+AAH8AAP4AAfwAA/gAB/AAD+AAH8AAP4AAfwAA/gAB/AAD//////////////////////8/+AD///wAf//+AD///wAf//+AH///4A////AH///4A////AH///8B///vgPv/98B9//vgPv/98D9//vwfP/8+D5//nwfP/8+D5//n4+P/8fHx//j4+P/8fHx//j8+P/8Pvh//h98P/8Pvh//h98P/8P/B//g/4P/8H/B//g/4P/8H/B//gfwP/8D+B/A/gAH//AAf/+AB//4AH//wAf//AB//+AH//8Af//wB///gH//+Af/78B//v4H/+fgf/5/B//j8H/+H4f/4fx//g/H/+D+f/4H5//gP3/+A///4B///gH//+AP//4Af//gB//+AD//4AP//gAf/+AA//4AD//gAH8AD/gAAD//gAB//+AAf//8AH///wB////Af+A/8D/AD/g/wAH+H8AAfx/gAD/P4AAP5/AAB/f4AAP/+AAA//wAAH/+AAA//wAAH/+AAA//wAAH/+AAA//wAAH//AAB/v4AAP5/AAB/P8AAf4/gAD+H+AA/wf4AP8D/wH/gP///4A///+AD///gAP//4AAf/8AAAf8AAP//4D///w///+P///z///+////v4A/7+AD//gAf/4AH/+AB//gAf/4AH/+AB//gA//4A/7///+////P///z///4///4P//4D+AAA/gAAP4AAD+AAA/gAAP4AAD+AAA/gAAP4AAD+AAA/gAAP4AAAAAP+AAAP/+AAH//4AB///wAf///AH///8B/4D/wP8AH+D/AAf4fwAB/H+AAP8/gAA/n8AAH9/gAA//4AAD//AAAf/4AAD//AAAf/4AAD//AAAf/4AAD//AAAf/8ACH+/gA4/n8APn8/wD//j+AP/4f4A//B/gD/wP/Af+A////wD////AP///8A////wB//z8AB/wPAAAAAwP//+A///+D///+P///4////z////P4AP+/gAf7+AA/v4AD+/gAP7+AA/v4AD+/gAfz+AD/P///4////D///wP///g////D///+P4Af4/gAfz+AB/P4AH8/gAfz+AB/P4AH8/gAfz+AB/P4AH8/gAfz+AB/v4AD/AP/AAD//gA///gH///A///+H///8f8D/z/AD/v4AH+/gAP7+AA/v4AAA/wAAD/wAAH/8AAf//gA///wB///wB///wA///gAH/+AAA/8AAA/wAAD/AAAH/+AAf/4AB//gAP//AA/n/AP+f///4////B///4D///AD//wAB/4A///////////////////////////AD+AAAfwAAD+AAAfwAAD+AAAfwAAD+AAAfwAAD+AAAfwAAD+AAAfwAAD+AAAfwAAD+AAAfwAAD+AAAfwAAD+AAAfwAAD+AAAfwAAD+AAAfwAAD+AAAfwAAD+AAAfwAP4AD//AAf/4AD//AAf/4AD//AAf/4AD//AAf/4AD//AAf/4AD//AAf/4AD//AAf/4AD//AAf/4AD//AAf/4AD//AAf/4AD//AAf/4AD//AAf/4AD//AAf/8AH+/wB/n/Af8f///D///4P//+A///gB//wAB/wAA/gAD//AAH9/AAfz+AA/n8AB/H8AD8P4AP4fwAfwfwA/A/gD+A/AH8B+APwD+A/gD8B/AH4D8AP4H4APwfwAfg/AA/h+AA/H4AB+PwAD8fgAD8+AAH78AAP34AAP/gAAf/AAA/+AAA/4AAB/wAAD/gAAD+AAAH8AAAP4AAP8AP4Af/+AH8AP9/AH+AH8/gD/gD+fwB/wB/H8A/4B/j+Af8A/h/Af/Afw/gPvgP4PwH3wH4H8D74H8D+B98D+A/B+fB/Afg+Pg/APwfHwfgH8Pj4fwB+Hw+PwA/H4fH4Afj4Pj8AH58Hx+AD8+D5+AB+fA+/AA/fAffgAPvgPvwAH/wH3wAD/4D/4AA/8A/8AAf8Af8AAP+AP+AAH/AH/AAB/gB/gAA/wA/gAAfwAfwAAH4AP4AH+AB/n/AD/D/AD/B/gH+B/gH8A/wP8A/wf4Af4f4AP4/wAP8/gAH9/gAD//AAD/+AAB/+AAB/8AAA/4AAAf4AAA/4AAA/8AAB/8AAB/+AAD//AAH//AAH9/gAP4/wAf4fwAfwf4A/wP8B/gP8B/gH+D/AH+D/AD/H+AD/v+AB/g/wAH//gAf5/gA/z/AD/D/AH+D+AP4H8A/wH8B/AP4H+AP4P4Afw/wAfx/AA/j+AA/v4AB/fwAB//AAD/+AAD/4AAH/gAAH/AAAH8AAAP4AAAfwAAA/gAAB/AAAD+AAAH8AAAP4AAAfwAAA/gAAB/AAAD+AAAH8AAAP4AAP/////////////////////////wAAP8AAH+AAD/AAB/gAA/4AAP8AAH+AAD/AAB/gAA/4AAP8AAH+AAD/AAB/gAA/4AAP8AAH+AAD/AAB/gAA/4AAP8AAH+AAD/////////////////////////8P/////////8P4fw/h/D+H8P4fw/h/D+H8P4fw/h/D+H8P4fw/h/D+H8P4fw/h/D+H8P4fw/////////gOADwAcAHAB4AOADgA8AHABwAeADgA4AOABwAcAHAA4AOADgAcAHABwAeADgA4APABwAcAHgA4AOADwAcP////////4fw/h/D+H8P4fw/h/D+H8P4fw/h/D+H8P4fw/h/D+H8P4fw/h/D+H8P4fw/h//////////gAD8AAfwAB/AAP+AA/4AD/wAffAB98AP34A+PgD4/Afh8B8HwPwfg+A+D4D8fgHx8AfHwB++AD7///////////////////w+D4PA8DgeAf8AD//AH//wP//4f//4f//8fwP8fgH8AAH8AAP8AA/8A//8H//8P//8f8H8/wH8/gH8/gP8/gP8/wf8///8f//8f//8P/3+H/D/B+AA/gAAfwAAP4AAH8AAD+AAB/AAA/gAAfwAAP4AAH8PwD+f+B/f/w///8f//+P///n/g/7/gP9/gD+/wB//wAf/4AP/8AH/+AD//AB//gA//4A//8Af3/Af7/wf9///8///8f//+P7/+H8/8AAH4AAA/wAH/8A//8D//8P//8f//5/wf7/Af38Af/wAA/gAB/AAD+AAH8AAP4AAfwAA/gAA/gD9/gP7/g/z///H//+H//4H//gD/+AB/gAAAD+AAB/AAA/gAAfwAAP4AAH8AAD+AAB/AAA/gH4fwP/P4f/38f//+P///P///v+D/3+A/7+AP//AH//AB//gA//wAf/4AP/8AH/+AD//gD/fwB/v8B/3/B/5///8///+P///D/+/gf+fwD8AAAD+AAP/gA//4B//8D//+D/D+H+A/H8A/H8AfP4Afv4Afv///v///v///v///v4AAP4AAP4AAH8Af38A/j/B/j///B//+A//8AP/wAD/AAH8H/D/w/8f/H+B/AfwH8B/D/+//v/7/+H8B/AfwH8B/AfwH8B/AfwH8B/AfwH8B/AfwH8B/AfwH8B/AAD4fwf+fw//fx//fz///z///3/D/3+B/38A//8A//4Af/4Af/4Af/4Af/4Af/4Af/4A//8A/3+B/3/D/z///z///x///w//fwf+fwH4fwAAfwAAfwAAf38A/38B/n/D/j///B//+A//4AH/AP4AAfwAA/gAB/AAD+AAH8AAP4AAfwAA/gAB/D+D+P/H9//P7//f//+/////4f//Af/+Af/4A//wB//gD//AH/+AP/8Af/4A//wB//gD//AH/+AP/8Af/4A//wB//gD//AH8///////AAAH////////////////////////////8H8fx/H8fx/AAAAAH8fx/H8fx/H8fx/H8fx/H8fx/H8fx/H8fx/H8fx/H8fx/H8fx///////7/v4A/gAB/AAD+AAH8AAP4AAfwAA/gAB/AAD+AAH8A/v4D+fwP8/g/x/D/D+H8H8fwP5/Af38A//wB//wD//gH//gP//gf9/A/z/B/D+D+D+H8H+P4H8fwP8/gP5/Af7+Af38A/z///////////////////////////////////////z+H4B+D+f+H/j+//P/z/////7/////7///////g/8P//Af4H/+AfwH/+AfwH/+AfwH/+AfwH/+AfwH/+AfwH/+AfwH/+AfwH/+AfwH/+AfwH/+AfwH/+AfwH/+AfwH/+AfwH/+AfwH/+AfwH/+AfwH8P4fwfz/4/v/5///7///3/////D//4D//gD//AH/+AP/8Af/4A//wB//gD//AH/+AP/8Af/4A//wB//gD//AH/+AP/8Af/4A/gB/gAH/8AH//gH//4H//+H///H/B/z/Af5/AH9/gD//gA//wAf/4AP/8AH/+AD//AB//wB/v4A/n+A/z/g/4///4P//8D//8A//8AP/4AA/wAD+H4B/P/A/v/4f3/+P///H///z/wf9/wH+/wB/f4A//4AP/8AH/+AD//AB//gA//wAf/8Af/+AP7/gP9/4P8///+f//+P7/+H9//D+f+B/D8A/gAAfwAAP4AAH8AAD+AAB/AAA/gAAfwAAP4AAH8AAAAD8P4H/n8P/7+H/9/H///n///3/B/7/Af9/AH//gD//gA//wAf/4AP/8AH/+AD//AB//wB/v4A/3+A/7/g/8///+P///H/+/h//fwP/P4B+H8AAD+AAB/AAA/gAAfwAAP4AAH8AAD+AAB/AAA/gAAfw/h/8f/v/9///////8H+A/wH8A/gH8A/gH8A/gH8A/gH8A/gH8A/gH8A/gH8A/gAA/wAH/+AP//gf//w///x/gf5/AP5/AP5/wAB//AB//4A///Af//wH//4Af/4AD/8AAf8AAH/+AH9/AH9/gf5///4///wf//gP//AB/4A/g/g/g/g/g/g/j///////8/g/g/g/g/g/g/g/g/g/g/g/g/g/g/g/g/8/8f8P8H/+AP/8Af/4A//wB//gD//AH/+AP/8Af/4A//wB//gD//AH/+AP/8Af/4A//wB//gD//AP//Af//D/////v///f/7+f/38f/P4P4AB/AD+/gB+fwB/H4A/j+Afh/AfwfgP4P4H4H8D8B+D+A/h+APw/AH4fgD8fgA/PwAfn4AP34AD/8AB/+AA/+AAP/AAH/gAD/gAA/wAAfwAA/AP4D//AfwH/+A/gPz8D/gfn4H/B/P4P+D+fwf8H4fg94Pw/D74/h/H3x+B+Pvj8D8ffH4H58ePwPz4+/AP3x9+Afvj78A/eH3wA/8H/gB/4P/AD/wf+AH/A/4AH+B/wAP8B/gAf4D+AAfwH8AD/AP9/gf4/gfw/w/wfw/gP5/AP7/AH/+AD/8AD/8AB/4AA/wAA/wAB/wAB/4AD/8AH/8AH/+AP5/Af5/Afw/g/w/x/gfx/Af7/AP9/AD+/gB/fwA/H8Afj+Afx/APwfwH4P4H8D8D8B/B+A/g/APw/AH4fgD+PwA/PwAfn4AP78AD98AB/+AA//AAP/AAH/gAD/wAA/wAAf4AAH8AAD8AAB+AAA/AAA/AAA/gAH/gAD/wAB/wAA/wAAfgAAH//+///3//+///3//+///wAP+AD/gAf4AH+AB/gAf4AH+AB/gAf4AH+AB/gAf4AH+AB////////////////////+AH4H8H+D/D/h+A+AfAPgHwD4B8A+AfAPgHwD4B8A+A/D/B/A/gf4B+AfAPgHwD4B8A+AfAPgHwD4B8A+AfgP+D/B/gfwH7//////////////////////////////AfwP8H+D/gPwD4B8A+AfAPgHwD4B8A+AfAPgHwD4B+Af4H8D+D/D8B8A+AfAPgHwD4B8A+AfAPgHwD4D8P+H+D/B/A/AB8AA/4AH/gP//D/D//wH/gAf4AA+A==","glyphs":[[0,0,0,13,0,1],[0,7,34,16,5,-33],[30,18,12,22,2,-33],[57,26,33,26,0,-31],[165,25,40,26,1,-34],[290,39,34,42,1,-32],[456,30,35,34,3,-33],[588,7,12,12,3,-33],[599,13,44,16,2,-33],[671,13,44,16,1,-33],[743,15,15,18,1,-33],[772,23,22,27,2,-21],[836,7,15,12,2,-6],[850,13,6,16,1,-15],[860,7,7,12,2,-6],[867,13,34,13,0,-32],[923,24,35,26,1,-33],[1028,14,33,26,4,-32],[1086,23,34,26,2,-33],[1184,23,35,26,2,-33],[1285,22,33,26,2,-32],[1376,23,34,26,2,-32],[1474,23,35,26,2,-33],[1575,23,33,26,1,-32],[1670,24,35,26,1,-33],[1775,24,35,26,1,-33],[1880,7,25,12,2,-24],[1902,7,33,12,2,-24],[1931,23,23,27,2,-22],[1998,23,18,27,2,-19],[2050,23,23,27,2,-22],[2117,24,35,29,3,-34],[2222,43,41,46,1,-34],[2443,32,34,33,0,-33],[2579,27,34,33,4,-33],[2694,30,36,34,2,-34],[2829,28,34,34,4,-33],[2948,25,34,31,4,-33],[3055,24,34,30,4,-33],[3157,31,36,36,2,-34],[3297,27,34,35,4,-33],[3412,7,34,15,4,-33],[3442,22,35,27,1,-33],[3539,30,34,34,4,-33],[3667,23,34,29,4,-33],[3765,33,34,41,4,-33],[3906,28,34,35,4,-33],[4025,33,36,37,2,-34],[4174,26,34,32,4,-33],[4285,33,37,37,2,-34],[4438,28,34,34,4,-33],[4557,28,36,32,2,-34],[4683,27,34,30,2,-33],[4798,27,35,35,4,-33],[4917,29,34,31,1,-33],[5041,43,34,45,1,-33],[5224,30,34,32,1,-33],[5352,29,34,30,1,-33],[5476,26,34,29,1,-33],[5587,11,43,16,3,-33],[5647,14,34,13,-1,-32],[5707,11,43,16,1,-33],[5767,22,20,27,3,-32],[5822,28,4,26,-1,6],[5836,9,7,12,1,-35],[5844,24,26,27,2,-24],[5922,25,35,29,3,-33],[6032,23,26,26,2,-24],[6107,25,35,29,2,-33],[6217,24,26,27,2,-24],[6295,14,34,16,1,-33],[6355,24,36,29,2,-24],[6463,23,34,28,3,-33],[6561,7,34,13,3,-33],[6591,10,45,13,0,-33],[6648,23,34,27,3,-33],[6746,7,34,13,3,-33],[6776,36,25,42,3,-24],[6889,23,25,29,3,-24],[6961,25,26,29,2,-24],[7043,25,36,29,3,-24],[7156,25,36,29,2,-24],[7269,15,25,18,3,-24],[7316,24,26,26,1,-24],[7394,12,32,16,2,-30],[7442,23,26,29,3,-24],[7517,25,25,25,0,-24],[7596,35,25,37,1,-24],[7706,24,25,26,1,-24],[7781,25,36,26,0,-24],[7894,21,25,24,1,-24],[7960,13,43,18,2,-33],[8030,4,44,13,5,-33],[8052,13,43,18,3,-33],[8122,21,8,23,1,-14]],"first":32,"last":126,"yAdvance":56}};</script>
+<script>const GFX_CLASSIC = {"bitmap": "AAAAAAA+W09bPj5rT2s+HD58PhwYPH48GBxXfVccHF5/XhwAGDwYAP/nw+f/ABgkGAD/59vn/zBIOgYOJil5KSZAfwUFB0B/BSU/WjznPFp/PhwcCAgcHD5/FCJ/IhRfXwBfXwYJfwF/AGaJlWpgYGBgYJSi/6KUCAR+BAgQIH4gEAgIKhwICBwqCAgeEBAQEAweDB4MMDg+ODAGDj4OBgAAAAAAAABfAAAABwAHABR/FH8UJCp/KhIjEwhkYjZJViBQAAgHAwAAHCJBAABBIhwAKhx/HCoICD4ICACAcDAACAgICAgAAGBgACAQCAQCPlFJRT4AQn9AAHJJSUlGIUFJTTMYFBJ/ECdFRUU5PEpJSTFBIREJBzZJSUk2RklJKR4AABQAAABANAAAAAgUIkEUFBQUFABBIhQIAgFZCQY+QV1ZTnwSERJ8f0lJSTY+QUFBIn9BQUE+f0lJSUF/CQkJAT5BQVFzfwgICH8AQX9BACBAQT8BfwgUIkF/QEBAQH8CHAJ/fwQIEH8+QUFBPn8JCQkGPkFRIV5/CRkpRiZJSUkyAwF/AQM/QEBAPx8gQCAfP0A4QD9jFAgUYwMEeAQDYVlJTUMAf0FBQQIECBAgAEFBQX8EAgECBEBAQEBAAAMHCAAgVFR4QH8oREQ4OERERCg4REQofzhUVFQYAAh+CQIYpKSceH8IBAR4AER9QAAgQEA9AH8QKEQAAEF/QAB8BHgEeHwIBAR4OERERDj8GCQkGBgkJBj8fAgEBAhIVFRUJAQEP0QkPEBAIHwcIEAgHDxAMEA8RCgQKERMkJCQfERkVExEAAg2QQAAAHcAAABBNggAAgECBAI8JiMmPB6hoWESOkBAIHo4VFRVWSFVVXlBIlRUeEIhVVR4QCBUVXlADB5SchI5VVVVWTlUVFRZOVVUVFgAAEV8QQACRX1CAAFFfEB9EhESffAoJSjwfFRVRQAgVFR8VHwKCX9JMklJSTI6REREOjJKSEgwOkFBIXo6QkAgeACdoKB9PUJCQj09QEBAPTwk/yQkSH5JQ2YrL/wvK/8JKfYgwIh+CQMgVFR5QQAARH1BMEhISjI4QEAiegB6CgpyfQ0ZMX0mKSkvKCYpKSkmMEhNQCA4CAgICAgICAg4LxDIrLovECg0+gAAewAACBQqFCIiFCoUCFUAVQBVqlWqVar/Vf9V/wAAAP8AEBAQ/wAUFBT/ABAQ/wD/EBDwEPAUFBT8ABQU9wD/AAD/AP8UFPQE/BQUFxAfEBAfEB8UFBQfABAQEPAAAAAAHxAQEBAfEBAQEPAQAAAA/xAQEBAQEBAQEP8QAAAA/xQAAP8A/wAAHxAXAAD8BPQUFBcQFxQU9AT0AAD/APcUFBQUFBQU9wD3FBQUFxQQEB8QHxQUFPQUEBDwEPAAAB8QHwAAAB8UAAAA/BQAAPAQ8BAQ/xD/FBQU/xQQEBAfAAAAAPAQ///////w8PDw8P///wAAAAAA//8PDw8PDzhERDhE/EpKSjR+AgIGBgJ+An4CY1VJQWM4REQ8BEB+IB4gBgJ+AgKZpeelmRwqSSocTHIBckwwSk1NMDBIeEgwvGJaRj0+SUlJAH4BAQF+KioqKipERF9EREBRSkRAQERKUUAAAP8BA+CA/wAACAhrawg2EjYkNgYPCQ8GAAAYGAAAABAQADBA/wEBAB8BAR4AGR0XEgA8PDw8AAAAAAA="};</script>
+<script>// Line-by-line JavaScript port of firmware/RideLogComputer/ride_logic.h, used by the simulator.
+// Kept in step with the C++ by test/compare_ports.sh (same input trace → same numbers).
+(function (root) {
+  'use strict';
+  const MIN_MOVING = 1.0, MAX_ACCURACY = 35.0, MAX_JUMP = 28.0, STOP_DELAY = 3.0, TRACK_STEP = 8.0, MAX_TRACK = 40000;
+  const f32 = Math.fround;
+  const lround = v => (v < 0 ? -Math.round(-v) : Math.round(v));     // C lround: halves away from zero
+
+  function haversine(lat1, lon1, lat2, lon2) {
+    const R = 6371000.0, rad = Math.PI / 180.0;
+    const dLat = (lat2 - lat1) * rad, dLon = (lon2 - lon1) * rad;
+    const h = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    return 2 * R * Math.asin(Math.sqrt(h));
+  }
+
+  function simplify(p, tolM = 4.0) {
+    if (p.length < 3) return p.slice();
+    const kx = 111320.0 * Math.cos(p[0].lat / 1e5 * Math.PI / 180.0) / 1e5, ky = 110540.0 / 1e5;
+    const keep = new Uint8Array(p.length); keep[0] = keep[p.length - 1] = 1;
+    const stack = [[0, p.length - 1]];
+    while (stack.length) {
+      const [a, b] = stack.pop();
+      const ax = p[a].lon * kx, ay = p[a].lat * ky, dx = p[b].lon * kx - ax, dy = p[b].lat * ky - ay;
+      const len2 = dx * dx + dy * dy;
+      let maxD = 0, idx = 0;
+      for (let i = a + 1; i < b; i++) {
+        const px = p[i].lon * kx, py = p[i].lat * ky;
+        let t = len2 > 0 ? ((px - ax) * dx + (py - ay) * dy) / len2 : 0;
+        t = Math.max(0.0, Math.min(1.0, t));
+        const ex = ax + t * dx - px, ey = ay + t * dy - py, d = ex * ex + ey * ey;
+        if (d > maxD) { maxD = d; idx = i; }
+      }
+      if (maxD > tolM * tolM) { keep[idx] = 1; stack.push([a, idx]); stack.push([idx, b]); }
+    }
+    return p.filter((_, i) => keep[i]);
+  }
+
+  function encodePolyline(p) {
+    let out = '', pa = 0, po = 0;
+    const enc = v => {
+      let u = (v < 0 ? ~(v << 1) : (v << 1)) >>> 0;
+      while (u >= 0x20) { out += String.fromCharCode((0x20 | (u & 0x1f)) + 63); u >>>= 5; }
+      out += String.fromCharCode(u + 63);
+    };
+    for (const q of p) { enc(q.lat - pa); enc(q.lon - po); pa = q.lat; po = q.lon; }
+    return out;
+  }
+
+  function bestSplit(pts, meters) {
+    let best = -1, i = 0;
+    for (let j = 0; j < pts.length; j++) {
+      while (i + 1 < j && pts[j][0] - pts[i + 1][0] >= meters) i++;
+      const dd = pts[j][0] - pts[i][0];
+      if (dd >= meters) {
+        const t = (pts[j][1] - pts[i][1]) * meters / dd;
+        if (t > 0 && (best < 0 || t < best)) best = t;
+      }
+    }
+    return best;
+  }
+
+  function hrZone(hr, maxHr) {
+    if (hr <= 0 || maxHr <= 0) return 0;
+    const p = hr / maxHr;
+    return p < .6 ? 1 : p < .7 ? 2 : p < .8 ? 3 : p < .9 ? 4 : 5;
+  }
+  function powerZone(w, ftp) {
+    if (w < 0 || ftp <= 0) return 0;
+    const p = w / ftp;
+    return p < .56 ? 1 : p < .76 ? 2 : p < .91 ? 3 : p < 1.06 ? 4 : p < 1.21 ? 5 : p < 1.51 ? 6 : 7;
+  }
+
+  const IDLE = 0, RUNNING = 1, PAUSED = 2, FINISHED = 3;
+  class Ride {
+    constructor(autoPauseOn = true, autoLapKm = 0) {
+      this.status = IDLE; this.autoPauseOn = autoPauseOn; this.autoLapKm = autoLapKm;
+      this.dist = 0; this.moving = 0; this.elev = 0; this.speed = 0; this.maxSpeed = 0;
+      this.autoPaused = false; this.laps = []; this.track = []; this.splits = [[0, 0]];
+      this.hrSum = 0; this.hrN = 0; this.pwSum = 0; this.pwN = 0; this.cadSum = 0; this.cadN = 0; this.hrMax = 0; this.pwMax = 0;
+      this.startedMs = 0; this.elapsedMs = 0;
+      this.hasLast = false; this.lastLat = 0; this.lastLon = 0; this.lastT = 0; this.stillSinceMs = 0; this.runningSince = 0;
+      this.lapD = 0; this.lapT = 0; this.lastSplitD = 0; this.nextAutoLap = 1;
+      this.altInit = false; this.altSm = 0; this.altBase = 0;
+    }
+    start(nowMs) { Object.assign(this, new Ride(this.autoPauseOn, this.autoLapKm)); this.status = RUNNING; this.startedMs = this.runningSince = nowMs; }
+    pause(nowMs) {
+      if (this.status !== RUNNING) return;
+      this.elapsedMs += nowMs - this.runningSince; this.status = PAUSED; this.hasLast = false; this.speed = 0; this.autoPaused = false;
+    }
+    resume(nowMs) { if (this.status === PAUSED) { this.status = RUNNING; this.runningSince = nowMs; this.hasLast = false; this.stillSinceMs = 0; } }
+    finish(nowMs) {
+      if (this.status === RUNNING) this.elapsedMs += nowMs - this.runningSince;
+      if (this.laps.length && this.dist - this.lapD > 50) this.closeLap();
+      this.status = FINISHED;
+    }
+    elapsed(nowMs) { return this.elapsedMs + (this.status === RUNNING ? nowMs - this.runningSince : 0); }
+    lapDist() { return this.dist - this.lapD; }
+    lapTime() { return this.moving - this.lapT; }
+    lap() {
+      if (this.status !== RUNNING || (this.lapDist() < 20 && this.lapTime() < 10)) return false;
+      this.closeLap(); return true;
+    }
+    onFix(lat, lon, speedMs, accuracyM, tMs) {
+      if (this.status !== RUNNING || accuracyM > MAX_ACCURACY) return false;
+      if (!this.hasLast) {
+        this.hasLast = true; this.lastLat = lat; this.lastLon = lon; this.lastT = tMs;
+        if (!this.track.length) this.track.push(Ride.toPt(lat, lon));
+        return false;
+      }
+      const dt = (tMs - this.lastT) / 1000.0;
+      if (dt <= 0) return false;
+      const d = haversine(this.lastLat, this.lastLon, lat, lon), vGps = d / dt;
+      if (vGps > MAX_JUMP) { this.lastLat = lat; this.lastLon = lon; this.lastT = tMs; return false; }
+      const v = speedMs >= 0 ? speedMs : vGps;
+      if (v < MIN_MOVING || d < Math.min(3.0, accuracyM * 0.3)) {
+        this.speed = 0;
+        if (!this.stillSinceMs) this.stillSinceMs = tMs ? tMs : 1;
+        if (this.autoPauseOn) { if ((tMs - this.stillSinceMs) / 1000.0 >= STOP_DELAY) this.autoPaused = true; }
+        else if (dt <= 15) this.moving += dt;
+        this.lastT = tMs;
+        return false;
+      }
+      this.stillSinceMs = 0; this.autoPaused = false;
+      this.dist += d;
+      if (dt <= 15) this.moving += dt;
+      this.speed = this.speed > 0 ? 0.6 * v + 0.4 * this.speed : v;
+      this.maxSpeed = Math.max(this.maxSpeed, this.speed);
+      if (this.dist - this.lastSplitD >= 20) { this.splits.push([f32(this.dist), f32(this.moving)]); this.lastSplitD = this.dist; }
+      if (this.track.length < MAX_TRACK) {
+        const b = this.track[this.track.length - 1];
+        if (haversine(b.lat / 1e5, b.lon / 1e5, lat, lon) >= TRACK_STEP) this.track.push(Ride.toPt(lat, lon));
+      }
+      this.lastLat = lat; this.lastLon = lon; this.lastT = tMs;
+      if (this.autoLapKm > 0 && this.dist >= this.nextAutoLap * this.autoLapKm * 1000) {
+        this.nextAutoLap = Math.floor(this.dist / (this.autoLapKm * 1000)) + 1;
+        this.closeLap(); return true;
+      }
+      return false;
+    }
+    onAltitude(altM) {
+      if (this.status !== RUNNING) return;
+      this.altSm = this.altInit ? this.altSm + 0.15 * (altM - this.altSm) : altM;
+      if (!this.altInit) { this.altInit = true; this.altBase = this.altSm; return; }
+      if (this.altSm < this.altBase) this.altBase = this.altSm;
+      else if (this.altSm - this.altBase >= 2.0) { this.elev += this.altSm - this.altBase; this.altBase = this.altSm; }
+    }
+    onSecond(hr, power, cadence) {
+      if (this.status !== RUNNING || this.autoPaused) return;
+      if (hr > 0) { this.hrSum += hr; this.hrN++; this.hrMax = Math.max(this.hrMax, hr); }
+      if (power >= 0) { this.pwSum += power; this.pwN++; this.pwMax = Math.max(this.pwMax, power); }
+      if (cadence > 0) { this.cadSum += cadence; this.cadN++; }
+    }
+    avgSpeed() { return this.moving > 0 ? this.dist / this.moving : 0; }
+    best10k() { return bestSplit(this.splits, 10000); }
+    static toPt(lat, lon) { return { lat: lround(lat * 1e5), lon: lround(lon * 1e5) }; }
+    closeLap() {
+      this.laps.push({ n: this.laps.length + 1, d: lround(this.dist - this.lapD), t: lround(this.moving - this.lapT) });
+      this.lapD = this.dist; this.lapT = this.moving;
+    }
+  }
+  Object.assign(Ride, { IDLE, RUNNING, PAUSED, FINISHED });
+
+  const api = { Ride, haversine, simplify, encodePolyline, bestSplit, hrZone, powerZone, lround };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.RideLogic = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script>
+'use strict';
+const { Ride, simplify, encodePolyline, hrZone, powerZone, lround } = window.RideLogic;
+const $ = s => document.querySelector(s);
+const store = { get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+                set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
+
+/* =====================================================================
+   Adafruit_GFX, ported: same text, rounded-rect and circle algorithms, so
+   pixels land exactly where the firmware puts them.
+   ===================================================================== */
+const W = 296, H = 128, INK = 1, PAPER = 0;
+function decodeFont(f) { const b = atob(f.bitmap); const bm = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) bm[i] = b.charCodeAt(i); return { ...f, bitmap: bm }; }
+const FONTS = Object.fromEntries(Object.entries(GFX_FONTS).map(([k, v]) => [k, decodeFont(v)]));
+const F9 = FONTS.FreeSans9pt7b, B12 = FONTS.FreeSansBold12pt7b, B18 = FONTS.FreeSansBold18pt7b;
+const CLASSIC = decodeFont({ ...GFX_CLASSIC, glyphs: [] }).bitmap;     // the built-in 5x7 font (glcdfont.c)
+class GFX {
+  constructor(w, h) { this.width = w; this.height = h; this.buf = new Uint8Array(w * h); this.font = null; this.sx = 1; this.sy = 1; this.color = INK; this.cx = 0; this.cy = 0; this.wrap = true; }
+  writePixel(x, y, c) { if (x < 0 || y < 0 || x >= this.width || y >= this.height) return; this.buf[y * this.width + x] = c; }
+  fillRect(x, y, w, h, c) { for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) this.writePixel(x + i, y + j, c); }
+  vline(x, y, h, c) { this.fillRect(x, y, 1, h, c); }
+  hline(x, y, w, c) { this.fillRect(x, y, w, 1, c); }
+  fillScreen(c) { this.buf.fill(c); }
+  drawCircleHelper(x0, y0, r, corner, c) {
+    let f = 1 - r, ddx = 1, ddy = -2 * r, x = 0, y = r; const P = (a, b) => this.writePixel(a, b, c);
+    while (x < y) {
+      if (f >= 0) { y--; ddy += 2; f += ddy; }
+      x++; ddx += 2; f += ddx;
+      if (corner & 4) { P(x0 + x, y0 + y); P(x0 + y, y0 + x); }
+      if (corner & 2) { P(x0 + x, y0 - y); P(x0 + y, y0 - x); }
+      if (corner & 8) { P(x0 - y, y0 + x); P(x0 - x, y0 + y); }
+      if (corner & 1) { P(x0 - y, y0 - x); P(x0 - x, y0 - y); }
+    }
+  }
+  fillCircleHelper(x0, y0, r, corners, delta, c) {
+    let f = 1 - r, ddx = 1, ddy = -2 * r, x = 0, y = r, px = x, py = y; delta++;
+    while (x < y) {
+      if (f >= 0) { y--; ddy += 2; f += ddy; }
+      x++; ddx += 2; f += ddx;
+      if (x < y + 1) { if (corners & 1) this.vline(x0 + x, y0 - y, 2 * y + delta, c); if (corners & 2) this.vline(x0 - x, y0 - y, 2 * y + delta, c); }
+      if (y !== py) { if (corners & 1) this.vline(x0 + py, y0 - px, 2 * px + delta, c); if (corners & 2) this.vline(x0 - py, y0 - px, 2 * px + delta, c); py = y; }
+      px = x;
+    }
+  }
+  drawRoundRect(x, y, w, h, r, c) {
+    const m = Math.trunc((w < h ? w : h) / 2); if (r > m) r = m;
+    this.hline(x + r, y, w - 2 * r, c); this.hline(x + r, y + h - 1, w - 2 * r, c);
+    this.vline(x, y + r, h - 2 * r, c); this.vline(x + w - 1, y + r, h - 2 * r, c);
+    this.drawCircleHelper(x + r, y + r, r, 1, c); this.drawCircleHelper(x + w - r - 1, y + r, r, 2, c);
+    this.drawCircleHelper(x + w - r - 1, y + h - r - 1, r, 4, c); this.drawCircleHelper(x + r, y + h - r - 1, r, 8, c);
+  }
+  fillRoundRect(x, y, w, h, r, c) {
+    const m = Math.trunc((w < h ? w : h) / 2); if (r > m) r = m;
+    this.fillRect(x + r, y, w - 2 * r, h, c);
+    this.fillCircleHelper(x + w - r - 1, y + r, r, 1, h - 2 * r - 1, c);
+    this.fillCircleHelper(x + r, y + r, r, 2, h - 2 * r - 1, c);
+  }
+  setFont(f) { this.font = f; } setTextSize(s) { this.sx = this.sy = Math.max(1, s); } setTextColor(c) { this.color = c; } setCursor(x, y) { this.cx = x; this.cy = y; }
+  charBounds(c, st) {
+    const f = this.font;
+    if (c === 10) { st.x = 0; st.y += this.sy * f.yAdvance; return; }
+    if (c === 13 || c < f.first || c > f.last) return;
+    const [, gw, gh, xa, xo, yo] = f.glyphs[c - f.first];
+    if (this.wrap && st.x + (xo + gw) * this.sx > this.width) { st.x = 0; st.y += this.sy * f.yAdvance; }
+    const x1 = st.x + xo * this.sx, y1 = st.y + yo * this.sy, x2 = x1 + gw * this.sx - 1, y2 = y1 + gh * this.sy - 1;
+    if (x1 < st.minx) st.minx = x1; if (y1 < st.miny) st.miny = y1; if (x2 > st.maxx) st.maxx = x2; if (y2 > st.maxy) st.maxy = y2;
+    st.x += xa * this.sx;
+  }
+  getTextBounds(str, x, y) {
+    const st = { x, y, minx: 0x7FFF, miny: 0x7FFF, maxx: -1, maxy: -1 };
+    for (const ch of str) this.charBounds(ch.charCodeAt(0) & 0xff, st);
+    let bx = x, by = y, bw = 0, bh = 0;
+    if (st.maxx >= st.minx) { bx = st.minx; bw = st.maxx - st.minx + 1; }
+    if (st.maxy >= st.miny) { by = st.miny; bh = st.maxy - st.miny + 1; }
+    return { x1: bx, y1: by, w: bw, h: bh };
+  }
+  drawChar(x, y, c) {
+    const f = this.font, [bo0, w, h, , xo, yo] = f.glyphs[c - f.first]; let bo = bo0, bits = 0, bit = 0;
+    for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) {
+      if (!(bit++ & 7)) bits = f.bitmap[bo++];
+      if (bits & 0x80) {
+        if (this.sx === 1 && this.sy === 1) this.writePixel(x + xo + xx, y + yo + yy, this.color);
+        else this.fillRect(x + (xo + xx) * this.sx, y + (yo + yy) * this.sy, this.sx, this.sy, this.color);
+      }
+      bits = (bits << 1) & 0xff;
+    }
+  }
+  drawCharClassic(x, y, c) {
+    if (c >= 176) c++;                                       // Adafruit's classic-charset quirk (_cp437 off)
+    for (let i = 0; i < 5; i++) {
+      let line = CLASSIC[c * 5 + i];
+      for (let j = 0; j < 8; j++, line >>= 1) if (line & 1) {
+        if (this.sx === 1 && this.sy === 1) this.writePixel(x + i, y + j, this.color);
+        else this.fillRect(x + i * this.sx, y + j * this.sy, this.sx, this.sy, this.color);
+      }
+    }
+  }
+  write(c) {
+    const f = this.font;
+    if (!f) {                                                // classic built-in font: cursor is the TOP-left
+      if (c === 10) { this.cx = 0; this.cy += this.sy * 8; return; }
+      if (c === 13) return;
+      if (this.wrap && this.cx + this.sx * 6 > this.width) { this.cx = 0; this.cy += this.sy * 8; }
+      this.drawCharClassic(this.cx, this.cy, c); this.cx += this.sx * 6; return;
+    }
+    if (c === 10) { this.cx = 0; this.cy += this.sy * f.yAdvance; return; }
+    if (c === 13 || c < f.first || c > f.last) return;
+    const [, w, h, xa, xo] = f.glyphs[c - f.first];
+    if (w > 0 && h > 0) {
+      if (this.wrap && this.cx + this.sx * (xo + w) > this.width) { this.cx = 0; this.cy += this.sy * f.yAdvance; }
+      this.drawChar(this.cx, this.cy, c);
+    }
+    this.cx += xa * this.sx;
+  }
+  print(s) { for (const ch of String(s)) this.write(ch.charCodeAt(0) & 0xff); }
+}
+const display = new GFX(W, H);
+
+/* =====================================================================
+   The firmware (RideLogComputer.ino, HW_V1_ALIEXPRESS), ported function by function.
+   millis() is the simulated clock.
+   ===================================================================== */
+const CFG = Object.assign({ MAX_HR: 190, FTP_WATTS: 250, AUTO_PAUSE: true, AUTO_LAP_KM: 0 }, store.get('sim.cfg', {}));
+const UTC_OFFSET_MIN = -new Date().getTimezoneOffset();
+const AP_PASSWORD = 'ridelog123';
+const SERIAL = store.get('sim.serial', null) || (() => { const s = Math.floor(Math.random() * 0xffff).toString(16).toUpperCase().padStart(4, '0'); store.set('sim.serial', s); return s; })();
+let simMs = 0; const millis = () => Math.floor(simMs);
+const PAGE_RIDE = 0, PAGE_SENSORS = 1, PAGE_LAPS = 2, PAGE_DEVICE = 3, PAGE_COUNT = 4;
+
+let dev = null;          // all firmware globals live here; power-cycling makes a fresh one (RAM is lost)
+let flashRides = store.get('sim.flash', []);   // LittleFS: survives power-off
+const GPS = { fix: false, satellites: 0, year: 0, month: 0, day: 0, hour: 0, minute: 0, seconds: 0, HDOP: 0 };
+
+function freshDevice() {
+  return { ride: new Ride(), gpsFix: false, baroOk: true, wifiOn: false, sats: 0, gpsAccuracy: 99, lastFixMs: 0, page: PAGE_RIDE,
+    flashMsg: '', flashUntil: 0, lastSaved: '', redrawNow: false,
+    buttons: { lap: btn(100000), start: btn(2000), page: btn(3000) },
+    sensors: { hr: sensor('HR'), pw: sensor('PWR'), cad: sensor('CAD') }, cadence: -1, cadenceAt: 0, pwBuf: [-1, -1, -1], pwBufAt: [0, 0, 0], pwIdx: 0,
+    lastScan: 0, scanUntil: 0, lastDraw: 0, lastSecond: 0, lastBaro: 0, lastFullRefresh: 0, forceFull: true, gpsNext: 1000, bootedAt: 0 };
+}
+function btn(longMs) { return { longMs, down: false, longDone: false, pendingShort: false, pendingLong: false, downAt: 0, upAt: 0, pin: false }; }
+function sensor(label) { return { label, connected: false, found: false, value: -1, at: 0 }; }
+
+const flash = (msg, ms = 5000) => { dev.flashMsg = msg; dev.flashUntil = millis() + ms; log(msg); };
+const batteryPercent = () => -1;                        // v1: no spare pin
+const fmtTime = (sec) => { const s = lround(sec); return `${Math.trunc(s / 3600)}:${String(Math.trunc(s / 60) % 60).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`; };
+function daysFromCivil(y, m, d) {
+  y -= m <= 2 ? 1 : 0; const era = Math.trunc((y >= 0 ? y : y - 399) / 400); const yoe = y - era * 400;
+  const doy = Math.trunc((153 * (m + (m > 2 ? -3 : 9)) + 2) / 5) + d - 1; const doe = yoe * 365 + Math.trunc(yoe / 4) - Math.trunc(yoe / 100) + doy;
+  return era * 146097 + doe - 719468;
+}
+const nowEpoch = () => GPS.year === 0 ? 0 : daysFromCivil(2000 + GPS.year, GPS.month, GPS.day) * 86400 + GPS.hour * 3600 + GPS.minute * 60 + GPS.seconds;
+
+// ---- buttons (ISR + takePress, including the short-tap fix) ----
+function edge(b, pressed) {
+  b.pin = pressed; const t = millis();
+  if (pressed && !b.down && t - b.upAt > 30) { b.down = true; b.downAt = t; b.longDone = false; }
+  else if (!pressed && b.down && t - b.downAt > 30) {
+    b.down = false; b.upAt = t;
+    if (!b.longDone) { if (t - b.downAt >= b.longMs) b.pendingLong = true; else b.pendingShort = true; }
+  }
+}
+function takePress(b) {
+  if (b.down && !b.pin && millis() - b.downAt > 50) { b.down = false; b.upAt = millis(); if (!b.longDone) b.pendingShort = true; }
+  let r = 0;
+  if (b.down && !b.longDone && millis() - b.downAt >= b.longMs) { b.longDone = true; r = 2; }
+  else if (b.pendingLong) { b.pendingLong = false; r = 2; }
+  else if (b.pendingShort) { b.pendingShort = false; r = 1; }
+  if (r) dev.redrawNow = true;
+  return r;
+}
+
+// ---- sensors ----
+const sensorGet = s => millis() - s.at < 5000 ? s.value : -1;
+const cadenceNow = () => millis() - dev.cadenceAt < 5000 ? dev.cadence : -1;
+function power3s() { let sum = 0, n = 0; const now = millis(); for (let i = 0; i < 3; i++) if (dev.pwBuf[i] >= 0 && now - dev.pwBufAt[i] < 3500) { sum += dev.pwBuf[i]; n++; } return n ? Math.trunc(sum / n) : -1; }
+function serviceSensors() {
+  for (const [k, s] of Object.entries(dev.sensors)) {
+    if (!s.found) continue;
+    s.found = false;
+    if (world.sensors[k].on) { s.connected = true; flash(`${s.label} connected`, 3000); }
+  }
+  const missing = Object.values(dev.sensors).some(s => !s.connected);
+  if (missing && millis() - dev.lastScan > 20000 && millis() >= dev.scanUntil) { dev.lastScan = millis(); dev.scanUntil = millis() + 6000; log('Scanning for Bluetooth sensors (6 s)', 'dim'); }
+}
+
+// ---- saving rides (Ride Log JSON), as saveRide() ----
+function saveRide() {
+  const r = dev.ride, epoch = nowEpoch() + UTC_OFFSET_MIN * 60, day = epoch > 0 ? Math.floor(epoch / 86400) : 0;
+  const z = day + 719468, era = Math.floor((z >= 0 ? z : z - 146096) / 146097), doe = z - era * 146097;
+  const yoe = Math.trunc((doe - Math.trunc(doe / 1460) + Math.trunc(doe / 36524) - Math.trunc(doe / 146096)) / 365); let y = yoe + era * 400;
+  const doy = doe - (365 * yoe + Math.trunc(yoe / 4) - Math.trunc(yoe / 100)), mp = Math.trunc((5 * doy + 2) / 153), d = doy - Math.trunc((153 * mp + 2) / 5) + 1, m = mp < 10 ? mp + 3 : mp - 9;
+  y += m <= 2 ? 1 : 0;
+  const date = epoch > 0 ? `${String(y).padStart(4, '0')}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}` : '2000-01-01';
+  const hour = epoch > 0 ? Math.floor(epoch % 86400 / 3600) : 12;
+  const part = hour < 5 ? 'Night' : hour < 12 ? 'Morning' : hour < 17 ? 'Afternoon' : hour < 21 ? 'Evening' : 'Night';
+  const id = 'rlc' + epoch.toString(16) + Math.floor(Math.random() * 0xffff).toString(16).padStart(4, '0');
+  const n = v => v == null ? 'null' : String(v), b = r.best10k();
+  let j = `{"id":"${id}","date":"${date}","name":"${part} ride","type":"training","distance":${(r.dist / 1000).toFixed(2)},"time":${Math.max(1, lround(r.moving))}`;
+  j += `,"elevation":${lround(r.elev)},"power":${n(r.pwN ? Math.trunc(r.pwSum / r.pwN) : null)},"hr":${n(r.hrN ? Math.trunc(r.hrSum / r.hrN) : null)}`;
+  j += `,"cadence":${n(r.cadN ? Math.trunc(r.cadSum / r.cadN) : null)},"maxHr":${n(r.hrMax || null)},"best10k":${n(b > 0 ? lround(b) : null)}`;
+  j += `,"position":null,"notes":"Recorded with the Ride Log bike computer. Max ${(r.maxSpeed * 3.6).toFixed(1)} km/h."`;
+  if (r.track.length > 1) j += `,"track":"${encodePolyline(simplify(r.track)).replace(/["\\]/g, '\\$&')}"`;
+  if (r.laps.length) j += `,"laps":[${r.laps.map(l => `{"n":${l.n},"d":${l.d},"t":${l.t}}`).join(',')}]`;
+  j += ',"updatedAt":0}';
+  flashRides.push(j); store.set('sim.flash', flashRides);
+  dev.lastSaved = `${date} ${(r.dist / 1000).toFixed(1)} km`;
+  return true;
+}
+const rideCount = () => flashRides.length;
+const apName = () => `RideLog-${SERIAL}`;
+function setWifi(on) { if (on === dev.wifiOn) return; dev.wifiOn = on; flash(on ? 'Wi-Fi transfer on' : 'Wi-Fi transfer off', 3000); renderPhone(); }
+
+// ---- drawing: drawTopBar / drawPageContents / drawPage for the 296x128 e-paper ----
+function textAt(font, s, x, y, align = 0, color = INK) {
+  display.setFont(font); display.setTextColor(color);
+  const b = display.getTextBounds(s, 0, 0);
+  display.setCursor(align === 1 ? x - Math.trunc(b.w / 2) - b.x1 : align === 2 ? x - b.w - b.x1 : x, y); display.print(s);
+}
+function smallAt(s, x, y, align = 0, color = INK) {         // built-in 5x7 font; y = top of the text
+  display.setFont(null); display.setTextSize(1); display.setTextColor(color);
+  const w = String(s).length * 6 - 1;
+  display.setCursor(align === 1 ? x - Math.trunc(w / 2) : align === 2 ? x - w : x, y); display.print(s);
+}
+function field(x, y, w, h, label, value, font = B12) {
+  display.drawRoundRect(x, y, w, h, 5, INK);
+  smallAt(label, x + 5, y + 4);
+  textAt(font, value, x + w - 5, y + h - (font === B18 ? 7 : 6), 2);
+}
+const orDash = v => v >= 0 ? String(v) : '--';
+function drawTopBar() {
+  const r = dev.ride, bh = 12;
+  display.fillRect(0, 0, W, bh, INK);
+  const st = r.status === Ride.RUNNING ? (r.autoPaused ? 'AUTO-PAUSE' : 'REC') : r.status === Ride.PAUSED ? 'PAUSED' : r.status === Ride.FINISHED ? 'SAVED' : 'READY';
+  smallAt(st, 3, 2, 0, PAPER);
+  smallAt(dev.gpsFix ? `GPS ${dev.sats}` : 'GPS ...', W / 2, 2, 1, PAPER);
+  let hw = ''; for (const k of ['hr', 'pw', 'cad']) if (dev.sensors[k].connected) hw += (hw ? ' ' : '') + dev.sensors[k].label;
+  if (hw) smallAt(hw, W / 2 + 34, 2, 0, PAPER);
+  if (GPS.year) { const e = nowEpoch() + UTC_OFFSET_MIN * 60; smallAt(`${String(Math.floor(e % 86400 / 3600)).padStart(2, '0')}:${String(Math.floor(e % 3600 / 60)).padStart(2, '0')}`, W - 3, 2, 2, PAPER); }
+}
+function drawPageContents() {
+  const r = dev.ride, now = millis();
+  const kmh = (r.status === Ride.RUNNING && now - dev.lastFixMs < 6000) ? r.speed * 3.6 : 0;
+  const avg = r.avgSpeed();
+  const trend = (r.status === Ride.RUNNING && avg > 0 && r.moving > 30 && r.speed > 0.5) ? (r.speed > avg * 1.03 ? '+avg' : r.speed < avg * .97 ? '-avg' : '=avg') : '';
+  const hr = sensorGet(dev.sensors.hr), pw = power3s(), cad = cadenceNow();
+  const hz = hrZone(hr, CFG.MAX_HR), pz = powerZone(pw, CFG.FTP_WATTS);
+  if (dev.page === PAGE_RIDE) {
+    smallAt('SPEED', 6, 18);
+    display.setTextSize(2); textAt(B18, kmh.toFixed(kmh >= 100 ? 0 : 1), 170, 92, 2); display.setTextSize(1);
+    smallAt('km/h', 6, 112); smallAt(trend, 170, 112, 2);
+    field(178, 14, 116, 38, 'Distance km', (r.dist / 1000).toFixed(2));
+    field(178, 52, 116, 38, 'Moving', fmtTime(r.moving));
+    field(178, 90, 116, 38, 'Avg km/h', (avg * 3.6).toFixed(1));
+  } else if (dev.page === PAGE_SENSORS) {
+    field(2, 14, 145, 56, 'Heart rate bpm', orDash(hr), B18);
+    field(149, 14, 145, 56, 'Power 3s W', orDash(pw), B18);
+    field(2, 72, 96, 56, 'HR zone', hz ? 'Z' + hz : '--', B18);
+    field(100, 72, 96, 56, 'Power zone', pz ? 'Z' + pz : '--', B18);
+    field(198, 72, 96, 56, 'Cadence rpm', orDash(cad), B18);
+  } else if (dev.page === PAGE_LAPS) {
+    field(2, 14, 145, 56, 'Lap time', fmtTime(r.lapTime()));
+    field(149, 14, 145, 56, 'Lap distance km', (r.lapDist() / 1000).toFixed(2), B18);
+    if (r.laps.length) {
+      const l = r.laps[r.laps.length - 1];
+      field(2, 72, 145, 56, `Last lap (${l.n})`, fmtTime(l.t));
+      field(149, 72, 145, 56, 'Last lap km/h', (l.t ? l.d / l.t * 3.6 : 0).toFixed(1), B18);
+    } else smallAt('Press LAP to start a new lap', W / 2, 96, 1);
+  }
+  if (dev.page === PAGE_DEVICE) {
+    let y = 44; const lh = 13;
+    textAt(B12, 'Device', 6, 36);
+    smallAt(`Rides saved: ${rideCount()}`, 6, y); y += lh;
+    smallAt(`Last: ${dev.lastSaved || '-'}`, 6, y); y += lh;
+    smallAt(`GPS ${dev.gpsFix ? 'fix' : 'searching'}   Barometer ${dev.baroOk ? 'ok' : 'MISSING'}`, 6, y); y += lh;
+    if (dev.wifiOn) { smallAt(`Wi-Fi ON: join ${apName()}`, 6, y); y += lh; smallAt(`password ${AP_PASSWORD}`, 6, y); y += lh; smallAt('then open http://192.168.4.1', 6, y); }
+    else smallAt('Hold START to send rides to your phone', 6, y);
+  }
+  if (millis() < dev.flashUntil) {
+    const bw = W - 24, bh = 34, by = (H - bh) / 2 + 6;
+    display.fillRoundRect(12, by, bw, bh, 8, INK);
+    textAt(F9, dev.flashMsg, W / 2, by + bh / 2 + 5, 1, PAPER);
+  }
+}
+function drawPage() {
+  const full = dev.forceFull || millis() - dev.lastFullRefresh > 180000;
+  if (full) { dev.lastFullRefresh = millis(); dev.forceFull = false; }
+  display.fillScreen(PAPER); drawTopBar(); drawPageContents();
+  panel.show(display.buf, full);
+}
+function splash(line) { display.fillScreen(PAPER); textAt(B18, 'Ride Log', W / 2, 60, 1); textAt(F9, line, W / 2, 92, 1); panel.show(display.buf, true); }
+
+// ---- buttons → actions (handleButtons) ----
+function handleButtons() {
+  const r = dev.ride, now = millis(), B = dev.buttons;
+  switch (takePress(B.start)) {
+    case 1:
+      if (r.status === Ride.IDLE || r.status === Ride.FINISHED) { r.autoPauseOn = CFG.AUTO_PAUSE; r.autoLapKm = CFG.AUTO_LAP_KM; r.start(now); flash(dev.gpsFix ? 'Ride started' : 'Started - waiting for GPS'); }
+      else if (r.status === Ride.RUNNING) { r.pause(now); flash('Paused - hold START to finish'); }
+      else if (r.status === Ride.PAUSED) { r.resume(now); flash('Resumed', 2000); }
+      break;
+    case 2:
+      if (r.status === Ride.RUNNING || r.status === Ride.PAUSED) {
+        r.finish(now);
+        flash(r.dist < 100 ? 'Too short - not saved' : saveRide() ? 'Ride saved' : 'SAVE FAILED', 5000);
+        dev.page = PAGE_RIDE; renderPhone();
+      } else if (dev.page === PAGE_DEVICE) setWifi(!dev.wifiOn);
+      break;
+  }
+  if (takePress(B.lap) === 1) {
+    if (r.lap()) { const l = r.laps[r.laps.length - 1]; flash(`Lap ${l.n}  ${fmtTime(l.t)}`); }
+  }
+  switch (takePress(B.page)) {
+    case 1: dev.page = (dev.page + 1) % PAGE_COUNT; break;
+    case 2: dev.forceFull = true; log('Full screen refresh (PAGE held 3 s)'); break;
+  }
+}
+
+// ---- setup() / one pass of loop() ----
+function setup() {
+  simMs = 0; dev = freshDevice(); GPS.fix = false; GPS.satellites = 0; GPS.year = 0;
+  splash('Starting...');
+  dev.lastScan = millis(); dev.scanUntil = millis() + 6000; dev.gpsNext = 1000;
+  log('Powered on: firmware starting, GPS searching');
+}
+function loopStep() {
+  const r = dev.ride;
+  // GPS: one RMC+GGA pair per second
+  if (millis() >= dev.gpsNext) {
+    dev.gpsNext += 1000;
+    const s = world.gpsSentence();
+    if (s) {
+      dev.gpsFix = GPS.fix; dev.sats = GPS.satellites; dev.gpsAccuracy = GPS.HDOP > 0 ? GPS.HDOP * 5.0 : 99;
+      if (dev.gpsFix) {
+        dev.lastFixMs = millis();
+        if (r.onFix(s.lat, s.lon, s.knots * 0.514444, dev.gpsAccuracy, dev.lastFixMs)) { const l = r.laps[r.laps.length - 1]; flash(`Lap ${l.n}  ${fmtTime(l.t)}`); }
+      }
+    }
+  }
+  const now = millis();
+  if (dev.baroOk && now - dev.lastBaro >= 250) { dev.lastBaro = now; r.onAltitude(world.alt + (Math.random() - .5) * 0.5); }
+  if (now - dev.lastSecond >= 1000) { dev.lastSecond = now; r.onSecond(sensorGet(dev.sensors.hr), power3s(), cadenceNow()); }
+  handleButtons();
+  serviceSensors();
+  const every = r.status === Ride.RUNNING ? 1000 : 4000;
+  if (now - dev.lastDraw >= every || dev.redrawNow) { dev.lastDraw = now; dev.redrawNow = false; drawPage(); }
+}
+
+/* =====================================================================
+   The e-paper panel: partial updates leave faint "ghosts" of old pixels;
+   a full refresh flashes black/white and clears them.
+   ===================================================================== */
+const panel = {
+  cur: new Uint8Array(W * H), ghost: new Float32Array(W * H), flashUntil: 0, partials: 0, fulls: 0,
+  show(buf, full) {
+    if (full) { this.ghost.fill(0); this.flashUntil = performance.now() + 420; this.fulls++; }
+    else { for (let i = 0; i < buf.length; i++) if (this.cur[i] === 1 && buf[i] === 0) this.ghost[i] = Math.min(0.14, this.ghost[i] + 0.035); this.partials++; }
+    this.cur.set(buf);
+  },
+};
+const ctx = $('#epd').getContext('2d'), img = ctx.createImageData(W, H);
+const hex = c => [parseInt(c.slice(1, 3), 16), parseInt(c.slice(3, 5), 16), parseInt(c.slice(5, 7), 16)];
+const PAPER_RGB = hex('#dfe0d8'), INK_RGB = hex('#1e201d');
+function paint() {
+  const t = panel.flashUntil - performance.now(), d = img.data;
+  if (t > 0) { const black = t > 210; for (let i = 0; i < W * H; i++) { const c = black ? INK_RGB : PAPER_RGB; d[i * 4] = c[0]; d[i * 4 + 1] = c[1]; d[i * 4 + 2] = c[2]; d[i * 4 + 3] = 255; } }
+  else for (let i = 0; i < W * H; i++) {
+    const g = panel.cur[i] ? 1 : panel.ghost[i];
+    for (let k = 0; k < 3; k++) d[i * 4 + k] = Math.round(PAPER_RGB[k] + (INK_RGB[k] - PAPER_RGB[k]) * g);
+    d[i * 4 + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
+/* =====================================================================
+   The world: you riding a route, GPS satellites, the air pressure, your sensors.
+   ===================================================================== */
+const ROUTES = [
+  { name: 'Morning loop · 12 km, two stops, one climb', loop: true, segs: [{ d: 1500, v: 26, g: 0 }, { stop: 35, why: 'traffic light' }, { d: 2500, v: 21, g: 4 }, { d: 800, v: 15, g: 7.5 }, { d: 2600, v: 38, g: -4.5 }, { stop: 22, why: 'junction' }, { d: 4600, v: 30, g: 0.3 }] },
+  { name: 'Hill repeats · 9 km, 3 × 1.4 km at 7 %', segs: [{ d: 500, v: 25, g: 0 }, { d: 1400, v: 15, g: 7, turn: 0 }, { d: 1400, v: 42, g: -7, turn: Math.PI }, { stop: 30, why: 'recover' }, { d: 1400, v: 15, g: 7, turn: Math.PI }, { d: 1400, v: 42, g: -7, turn: Math.PI }, { stop: 30, why: 'recover' }, { d: 1400, v: 14, g: 7, turn: Math.PI }, { d: 1400, v: 43, g: -7, turn: Math.PI }] },
+  { name: 'Steady 20 km, no stops', loop: true, segs: [{ d: 20000, v: 31, g: 0.2 }] },
+];
+const world = {
+  route: 0, seg: 0, segDone: 0, stopLeft: 0, riding: false, gpsOn: true, speedX: 1,
+  lat: 51.5033, lon: -0.1196, head: 0.6, alt: 18, v: 0, rideDist: 0, utcMs: Date.now(), poweredAt: 0, finished: false,
+  hr: 72, sensors: { hr: { on: false, label: 'Heart-rate strap' }, pw: { on: false, label: 'Power meter (with cadence)' }, cad: { on: false, label: 'Cadence sensor' } },
+  total() { return ROUTES[this.route].segs.reduce((a, s) => a + (s.d || 0), 0); },
+  reset() { Object.assign(this, { seg: 0, segDone: 0, stopLeft: 0, lat: 51.5033, lon: -0.1196, head: 0.6, alt: 18, v: 0, rideDist: 0, finished: false }); const s = ROUTES[this.route].segs[0]; if (s.stop) this.stopLeft = s.stop; },
+  grade() { const s = ROUTES[this.route].segs[this.seg]; return s && !s.stop ? s.g : 0; },
+  step(dt) {            // dt in seconds
+    this.utcMs += dt * 1000;
+    const R = ROUTES[this.route], s = R.segs[this.seg];
+    let target = 0;
+    if (this.riding && s && !this.finished) {
+      if (s.stop) { this.stopLeft -= dt; if (this.stopLeft <= 0) this.nextSeg(); }
+      else target = s.v / 3.6 * (1 + 0.04 * Math.sin(this.utcMs / 7000) + 0.03 * Math.sin(this.utcMs / 2300));
+    }
+    this.v += (target - this.v) * Math.min(1, dt / (target > this.v ? 4 : 1.6));     // accelerate gently, brake faster
+    if (this.v < 0.05) this.v = 0;
+    const dm = this.v * dt;
+    if (dm > 0 && s && !s.stop) {
+      this.segDone += dm; this.rideDist += dm;
+      this.head += R.loop ? dm * (2 * Math.PI / this.total()) * (1 + 0.6 * Math.sin(this.rideDist / 600)) : dm * 0.00012 * Math.sin(this.rideDist / 300);
+      this.lat += dm * Math.cos(this.head) / 111320; this.lon += dm * Math.sin(this.head) / (111320 * Math.cos(this.lat * Math.PI / 180));
+      this.alt += dm * s.g / 100;
+      if (this.segDone >= s.d) this.nextSeg();
+    }
+    // rider effort → power, heart rate, cadence
+    const g = this.grade() / 100, pw = this.v > 0.5 ? Math.max(0, 0.5 * 1.2 * 0.34 * this.v ** 3 + 80 * 9.81 * this.v * (g + 0.004)) : 0;
+    this.power = Math.round(pw * (0.92 + 0.16 * Math.random()));
+    this.hr += ((pw > 0 ? 78 + pw * 0.33 : 74) - this.hr) * Math.min(1, dt / 22);
+    this.cad = this.v > 1 ? Math.round(86 + 6 * Math.sin(this.utcMs / 9000) + Math.random() * 3) : 0;
+  },
+  nextSeg() {
+    const R = ROUTES[this.route]; this.seg++; this.segDone = 0;
+    if (this.seg >= R.segs.length) { this.finished = true; this.seg = R.segs.length; log('Route finished: you\u2019ve stopped. Hold START on the device to save.', 'good'); return; }
+    const s = R.segs[this.seg]; if (s.turn) this.head += s.turn;
+    if (s.stop) { this.stopLeft = s.stop; log(`Stopping ${s.stop} s (${s.why})`, 'dim'); }
+  },
+  gpsSentence() {
+    if (!this.gpsOn) { GPS.fix = false; GPS.satellites = 0; return null; }
+    const since = millis() - this.poweredAt;
+    if (since < 9000) { GPS.fix = false; GPS.satellites = Math.floor(since / 2500); return { lat: 0, lon: 0, knots: 0 }; }
+    const u = new Date(this.utcMs);
+    Object.assign(GPS, { fix: true, satellites: 8 + Math.round(2 * Math.sin(this.utcMs / 60000)), HDOP: 0.9 + 0.3 * Math.random(),
+      year: u.getUTCFullYear() - 2000, month: u.getUTCMonth() + 1, day: u.getUTCDate(), hour: u.getUTCHours(), minute: u.getUTCMinutes(), seconds: u.getUTCSeconds() });
+    const jitter = () => (Math.random() - .5) * 2.4e-5;     // about ±1.3 m
+    return { lat: this.lat + jitter(), lon: this.lon + jitter(), knots: Math.round(this.v / 0.514444 * 100) / 100 };
+  },
+  sensorStep() {        // once a second: connected sensors send a reading
+    const S = dev.sensors, now = millis();
+    for (const k of ['hr', 'pw', 'cad']) {
+      if (S[k].connected && !this.sensors[k].on) { S[k].connected = false; log(`${S[k].label} disconnected`, 'warn'); }
+      if (!S[k].connected && this.sensors[k].on && now < dev.scanUntil) S[k].found = true;
+    }
+    if (S.hr.connected) { S.hr.value = Math.round(this.hr + Math.random() * 2); S.hr.at = now; }
+    if (S.pw.connected) { S.pw.value = this.power; S.pw.at = now; dev.pwBuf[dev.pwIdx] = this.power; dev.pwBufAt[dev.pwIdx] = now; dev.pwIdx = (dev.pwIdx + 1) % 3; }
+    if (S.pw.connected || S.cad.connected) { dev.cadence = this.cad; dev.cadenceAt = now; }
+  },
+};
+
+/* =====================================================================
+   Running it: advance simulated time in 50 ms steps, as fast as the speed setting asks.
+   ===================================================================== */
+let powered = true, last = performance.now(), sensorAcc = 0, worldAcc = 0;
+const held = () => Object.values(dev.buttons).some(b => b.pin);
+function frame(t) {
+  const realDt = Math.min(0.1, (t - last) / 1000); last = t;
+  const x = held() ? 1 : world.speedX;
+  let vdt = realDt * x * 1000;
+  while (vdt > 0) {
+    const step = Math.min(50, vdt); vdt -= step;
+    worldAcc += step; if (worldAcc >= 200) { world.step(worldAcc / 1000); worldAcc = 0; }
+    if (!powered) continue;
+    simMs += step;
+    sensorAcc += step; if (sensorAcc >= 1000) { sensorAcc -= 1000; world.sensorStep(); }
+    loopStep();
+  }
+  paint(); renderInfo();
+  requestAnimationFrame(frame);
+}
+
+/* ---------------- UI ---------------- */
+const logEl = $('#log');
+function log(msg, cls = '') {
+  const li = document.createElement('li'); const tm = document.createElement('time');
+  const s = Math.floor(simMs / 1000); tm.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  const span = document.createElement('span'); span.textContent = msg; if (cls) span.className = cls;
+  li.append(tm, span); logEl.prepend(li);
+  while (logEl.children.length > 60) logEl.lastChild.remove();
+}
+function renderInfo() {
+  const r = dev.ride, st = ['Idle', 'Recording', 'Paused', 'Saved'][r.status] + (r.status === Ride.RUNNING && r.autoPaused ? ' (auto-paused)' : '');
+  const rows = [
+    ['Status', powered ? st : 'Power off'], ['Distance', (r.dist / 1000).toFixed(3) + ' km'], ['Moving time', fmtTime(r.moving)], ['Elapsed', fmtTime(r.elapsed(millis()) / 1000)],
+    ['Speed (device)', (r.speed * 3.6).toFixed(1) + ' km/h'], ['Average', (r.avgSpeed() * 3.6).toFixed(1) + ' km/h'], ['Climbing', r.elev.toFixed(1) + ' m'], ['Laps', String(r.laps.length)],
+    ['Route points', String(r.track.length)], ['Fastest 10 km', r.best10k() > 0 ? fmtTime(r.best10k()) : '—'],
+    ['Avg HR / power', `${r.hrN ? Math.trunc(r.hrSum / r.hrN) : '—'} / ${r.pwN ? Math.trunc(r.pwSum / r.pwN) + ' W' : '—'}`],
+    ['GPS', dev.gpsFix ? `fix, ${dev.sats} sats, ±${dev.gpsAccuracy.toFixed(0)} m` : 'searching'],
+    ['Screen refreshes', `${panel.partials} partial · ${panel.fulls} full`], ['Rides in flash', String(rideCount())], ['Uptime', fmtTime(millis() / 1000)], ['You (real)', `${(world.v * 3.6).toFixed(1)} km/h · ${world.grade()} %`],
+  ];
+  const kv = $('#kv');
+  if (kv.children.length !== rows.length) kv.innerHTML = rows.map(() => '<div><span></span><b></b></div>').join('');
+  rows.forEach(([k, v], i) => { const c = kv.children[i]; c.firstChild.textContent = k; c.lastChild.textContent = v; });
+  const tot = world.total();
+  $('#routeBar').style.width = Math.min(100, world.rideDist / tot * 100) + '%';
+  $('#routeMeta').textContent = `${(world.rideDist / 1000).toFixed(2)} / ${(tot / 1000).toFixed(1)} km · ${world.finished ? 'finished' : world.riding ? (ROUTES[world.route].segs[world.seg]?.stop ? `stopped (${Math.ceil(world.stopLeft)} s)` : 'riding') : 'standing still'} · simulated time ${fmtTime(simMs / 1000)}`;
+  renderSensorStates();
+}
+
+// route + speed + GPS
+$('#route').innerHTML = ROUTES.map((r, i) => `<option value="${i}">${r.name}</option>`).join('');
+$('#route').onchange = e => { world.route = +e.target.value; world.reset(); world.riding = false; syncPlay(); log(`Route: ${ROUTES[world.route].name}`, 'dim'); };
+function syncPlay() { const b = $('#ridePlay'); b.textContent = world.riding ? 'Stop at the roadside' : world.rideDist > 0 ? 'Ride on' : 'Start riding'; b.setAttribute('aria-pressed', String(world.riding)); }
+$('#ridePlay').onclick = () => { world.riding = !world.riding; if (world.finished && world.riding) { world.reset(); } syncPlay(); log(world.riding ? 'You start pedalling' : 'You stop at the roadside', 'dim'); };
+$('#rideReset').onclick = () => { world.reset(); world.riding = false; syncPlay(); log('Back at the start of the route', 'dim'); };
+$('#speedSeg').onclick = e => { const b = e.target.closest('[data-x]'); if (!b) return; world.speedX = +b.dataset.x; syncSpeed(); };
+function syncSpeed() { document.querySelectorAll('#speedSeg button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.x === world.speedX))); }
+$('#gpsToggle').onclick = e => { world.gpsOn = !world.gpsOn; e.target.textContent = world.gpsOn ? 'GPS signal on' : 'GPS signal lost (tunnel)'; e.target.setAttribute('aria-pressed', String(world.gpsOn)); log(world.gpsOn ? 'GPS signal back' : 'Into a tunnel: no GPS', world.gpsOn ? 'dim' : 'warn'); };
+
+// sensors
+function renderSensors() {
+  $('#sensors').innerHTML = Object.entries(world.sensors).map(([k, s]) => `<div class="sensor"><div><div class="n">${s.label}</div><div class="s" id="ss-${k}"></div></div>
+    <button class="b" data-sensor="${k}" aria-pressed="${s.on}">${s.on ? 'Turn off' : 'Wake up'}</button></div>`).join('');
+}
+function renderSensorStates() {
+  for (const [k, s] of Object.entries(world.sensors)) {
+    const el = $('#ss-' + k); if (!el) continue;
+    const d = dev.sensors[k];
+    const txt = !s.on ? 'Asleep' : d.connected ? `Connected · ${k === 'hr' ? Math.round(world.hr) + ' bpm' : k === 'pw' ? world.power + ' W' : world.cad + ' rpm'}` : millis() < dev.scanUntil ? 'Awake · device is scanning…' : `Awake · waiting for the device's next scan (${Math.max(0, Math.ceil((20000 - (millis() - dev.lastScan)) / 1000))} s)`;
+    const cls = !s.on ? '' : d.connected ? 'on' : 'wait';
+    if (el.dataset.t !== txt) { el.dataset.t = txt; el.innerHTML = `<span class="dot ${cls}"></span>${txt}`; }
+  }
+}
+$('#sensors').onclick = e => { const b = e.target.closest('[data-sensor]'); if (!b) return; const s = world.sensors[b.dataset.sensor]; s.on = !s.on; renderSensors(); log(`${s.label} ${s.on ? 'woken up' : 'switched off'}`, 'dim'); };
+
+// config.h
+const cfgEls = { MAX_HR: '#cfgMaxHr', FTP_WATTS: '#cfgFtp', AUTO_LAP_KM: '#cfgLap', AUTO_PAUSE: '#cfgPause' };
+for (const [k, sel] of Object.entries(cfgEls)) {
+  const el = $(sel); el.value = k === 'AUTO_PAUSE' ? (CFG[k] ? '1' : '0') : String(CFG[k]);
+  el.onchange = () => { CFG[k] = k === 'AUTO_PAUSE' ? el.value === '1' : Math.max(0, +el.value || 0); store.set('sim.cfg', CFG); log(`config.h: ${k} = ${CFG[k]} (used from the next ride)`, 'dim'); };
+}
+
+// hardware buttons: pointer + keyboard
+const BTN = { btnLap: 'lap', btnStart: 'start', btnPage: 'page' }, KEY = { s: 'start', l: 'lap', p: 'page' };
+const press = (k, down) => { if (!powered) return; const b = dev.buttons[k]; if (b.pin === down) return; edge(b, down); document.getElementById(Object.keys(BTN).find(id => BTN[id] === k)).classList.toggle('down', down); };
+for (const [id, k] of Object.entries(BTN)) {
+  const el = document.getElementById(id);
+  el.addEventListener('pointerdown', e => { e.preventDefault(); el.setPointerCapture(e.pointerId); press(k, true); });
+  ['pointerup', 'pointercancel'].forEach(ev => el.addEventListener(ev, () => press(k, false)));
+  el.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.repeat) { e.preventDefault(); press(k, true); } });
+  el.addEventListener('keyup', e => { if (e.key === 'Enter') press(k, false); });
+}
+document.addEventListener('keydown', e => { const k = KEY[e.key.toLowerCase()]; if (!k || e.repeat || e.ctrlKey || e.metaKey || e.altKey || /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return; e.preventDefault(); press(k, true); });
+document.addEventListener('keyup', e => { const k = KEY[e.key.toLowerCase()]; if (k) press(k, false); });
+
+// power switch
+$('#power').onclick = e => {
+  powered = !powered; e.target.setAttribute('aria-checked', String(powered));
+  if (!powered) {
+    const lost = dev.ride.status === Ride.RUNNING || dev.ride.status === Ride.PAUSED;
+    log(lost ? 'Power off: the ride in progress was NOT saved (v1 keeps rides only when you finish them)' : 'Power off: the e-paper keeps showing the last screen', lost ? 'bad' : '');
+    Object.values(dev.buttons).forEach(b => b.pin = false); dev.wifiOn = false; renderPhone();
+  } else { world.poweredAt = 0; setup(); }
+};
+
+// phone (Wi-Fi transfer page)
+function renderPhone() {
+  const on = powered && dev && dev.wifiOn;
+  $('#phone').hidden = !on;
+  $('#phoneSub').textContent = on ? `Joined ${apName()} (password ${AP_PASSWORD}) and opened http://192.168.4.1` : 'On the device, go to the Device page and hold START to turn on Wi-Fi transfer.';
+  $('#phoneWifi').textContent = apName();
+  $('#phoneCount').textContent = `${rideCount()} ride(s) saved on the device.`;
+  $('#phoneList').innerHTML = flashRides.map(j => { try { const r = JSON.parse(j); return `<li>${r.id}.json · ${r.date} · ${r.distance} km</li>`; } catch { return ''; } }).join('');
+}
+$('#dlRides').onclick = async () => {
+  if (!flashRides.length) { log('No rides on the device yet', 'warn'); return; }
+  const data = '[' + flashRides.join(',') + ']', filename = 'ridelog-device-rides.json';
+  const dl = window.claude?.use ? await window.claude.use('downloads').catch(() => null) : null;
+  if (dl) { try { await dl.save({ filename, data }); log('Downloaded ' + filename, 'good'); } catch (x) { if (x?.code !== 'declined') log('Download not available here', 'warn'); } return; }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([data], { type: 'application/json' })); a.download = filename; document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 0);
+  log('Downloaded ' + filename, 'good');
+};
+$('#clearRides').onclick = () => $('#clearConfirm').classList.add('open');
+$('#clearNo').onclick = () => $('#clearConfirm').classList.remove('open');
+$('#clearYes').onclick = () => { flashRides = []; store.set('sim.flash', flashRides); $('#clearConfirm').classList.remove('open'); renderPhone(); log('Rides deleted from the device'); };
+
+// go
+world.reset(); renderSensors(); syncPlay(); syncSpeed();
+setup(); world.poweredAt = 0; renderPhone();
+requestAnimationFrame(frame);
+</script>
